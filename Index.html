@@ -1,8 +1,13 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Locker</title><style>
+<title>My Locker</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
 * {
     box-sizing: border-box;
     margin: 0;
@@ -14,17 +19,17 @@ body {
     font-family: Arial, sans-serif;
     color: white;
     background:
-        radial-gradient(circle at 10% 10%, #242424, transparent 30%),
-        radial-gradient(circle at 90% 90%, #1a1a1a, transparent 30%),
+        radial-gradient(circle at 10% 10%, #252525, transparent 30%),
+        radial-gradient(circle at 90% 90%, #191919, transparent 30%),
         #000;
 }
 
 .screen {
     min-height: 100vh;
-    padding: 25px;
+    padding: 20px;
 }
 
-.login-screen {
+.center {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -34,7 +39,1074 @@ body {
     width: 100%;
     max-width: 420px;
     padding: 35px 28px;
+    background: rgba(15,15,15,.94);
     border: 1px solid #333;
+    border-radius: 25px;
+    box-shadow: 0 0 50px rgba(255,255,255,.08);
+    text-align: center;
+}
+
+.lock {
+    font-size: 55px;
+    margin-bottom: 15px;
+}
+
+h1 {
+    letter-spacing: 4px;
+}
+
+.subtitle {
+    color: #888;
+    margin: 10px 0 25px;
+}
+
+input {
+    width: 100%;
+    padding: 15px;
+    margin: 7px 0;
+    border: 1px solid #333;
+    border-radius: 12px;
+    background: #090909;
+    color: white;
+    outline: none;
+}
+
+button {
+    padding: 14px 20px;
+    border: 0;
+    border-radius: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    background: white;
+    color: black;
+}
+
+.main-button {
+    width: 100%;
+    margin-top: 12px;
+}
+
+.secondary {
+    width: 100%;
+    margin-top: 12px;
+    background: #181818;
+    color: white;
+    border: 1px solid #333;
+}
+
+.message {
+    margin-top: 15px;
+    color: #aaa;
+}
+
+.hidden {
+    display: none !important;
+}
+
+
+/* DASHBOARD */
+
+.header {
+    max-width: 1100px;
+    margin: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0 25px;
+}
+
+.logo {
+    font-size: 22px;
+    font-weight: bold;
+    letter-spacing: 3px;
+}
+
+.logout {
+    background: #181818;
+    color: white;
+    border: 1px solid #333;
+}
+
+.dashboard {
+    max-width: 1100px;
+    margin: auto;
+}
+
+.welcome {
+    margin-bottom: 25px;
+}
+
+.welcome p {
+    color: #777;
+    margin-top: 7px;
+}
+
+.upload {
+    border: 1px dashed #444;
+    border-radius: 20px;
+    padding: 35px;
+    text-align: center;
+    background: rgba(15,15,15,.8);
+}
+
+.upload-icon {
+    font-size: 45px;
+}
+
+.upload p {
+    color: #777;
+    margin: 10px 0 20px;
+}
+
+.files-title {
+    margin: 30px 0 15px;
+}
+
+.file-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fill, minmax(180px, 1fr));
+    gap: 15px;
+}
+
+.file-card {
+    background: #101010;
+    border: 1px solid #292929;
+    border-radius: 18px;
+    padding: 20px;
+    transition: .2s;
+}
+
+.file-card:hover {
+    border-color: #555;
+    transform: translateY(-3px);
+}
+
+.file-icon {
+    font-size: 40px;
+}
+
+.file-name {
+    margin-top: 12px;
+    word-break: break-word;
+}
+
+.file-size {
+    color: #666;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+.file-actions {
+    display: flex;
+    gap: 7px;
+    margin-top: 15px;
+}
+
+.file-actions button {
+    flex: 1;
+    padding: 9px;
+}
+
+.open-btn {
+    background: white;
+    color: black;
+}
+
+.delete-btn {
+    background: #1d1d1d;
+    color: #aaa;
+    border: 1px solid #333;
+}
+
+
+/* VIEWER */
+
+.viewer {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.97);
+    z-index: 100;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+}
+
+.viewer-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.viewer-title {
+    max-width: 75%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.close {
+    background: #222;
+    color: white;
+    border: 1px solid #444;
+}
+
+.viewer-content {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+}
+
+.viewer-content img {
+    max-width: 100%;
+    max-height: 90vh;
+    object-fit: contain;
+}
+
+.viewer-content video {
+    max-width: 100%;
+    max-height: 85vh;
+}
+
+.viewer-content iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: white;
+    border-radius: 10px;
+}
+
+.empty {
+    color: #666;
+    text-align: center;
+    padding: 40px;
+    border: 1px solid #222;
+    border-radius: 18px;
+}
+
+@media (max-width: 600px) {
+    .logo {
+        font-size: 17px;
+    }
+
+    .upload {
+        padding: 25px 15px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+
+<!-- LOGIN -->
+
+<div id="loginScreen" class="screen center">
+
+<div class="box">
+
+    <div class="lock">🔐</div>
+
+    <h1>MY LOCKER</h1>
+
+    <p class="subtitle">
+        Secure digital vault
+    </p>
+
+    <input id="loginEmail"
+           type="email"
+           placeholder="Email">
+
+    <input id="loginPassword"
+           type="password"
+           placeholder="Password">
+
+    <button class="main-button"
+            onclick="login()">
+        LOGIN
+    </button>
+
+    <button class="secondary"
+            onclick="showSignup()">
+        CREATE ACCOUNT
+    </button>
+
+    <p id="loginMessage"
+       class="message"></p>
+
+</div>
+
+</div>
+
+
+<!-- SIGNUP -->
+
+<div id="signupScreen"
+     class="screen center hidden">
+
+<div class="box">
+
+    <div class="lock">👤</div>
+
+    <h1>CREATE</h1>
+
+    <p class="subtitle">
+        Create your locker account
+    </p>
+
+    <input id="signupEmail"
+           type="email"
+           placeholder="Email">
+
+    <input id="signupPassword"
+           type="password"
+           placeholder="Password (8+ characters)">
+
+    <input id="signupConfirm"
+           type="password"
+           placeholder="Confirm password">
+
+    <button class="main-button"
+            onclick="signup()">
+        CREATE ACCOUNT
+    </button>
+
+    <button class="secondary"
+            onclick="showLogin()">
+        BACK TO LOGIN
+    </button>
+
+    <p id="signupMessage"
+       class="message"></p>
+
+</div>
+
+</div>
+
+
+<!-- DASHBOARD -->
+
+<div id="dashboard"
+     class="screen hidden">
+
+<div class="header">
+
+    <div class="logo">
+        🔐 MY LOCKER
+    </div>
+
+    <button class="logout"
+            onclick="logout()">
+        LOGOUT
+    </button>
+
+</div>
+
+
+<div class="dashboard">
+
+    <div class="welcome">
+
+        <h2>
+            Welcome to your locker
+        </h2>
+
+        <p id="userEmail"></p>
+
+    </div>
+
+
+    <div class="upload">
+
+        <div class="upload-icon">
+            ☁️
+        </div>
+
+        <h2>
+            Add files
+        </h2>
+
+        <p>
+            Photos • Videos • PDFs • Other files
+        </p>
+
+        <input id="fileInput"
+               type="file"
+               multiple
+               hidden
+               onchange="uploadFiles()">
+
+        <button onclick="chooseFiles()">
+            + SELECT FILES
+        </button>
+
+    </div>
+
+
+    <h2 class="files-title">
+        My Files
+    </h2>
+
+    <div id="fileGrid"
+         class="file-grid">
+
+        <div class="empty">
+            Loading files...
+        </div>
+
+    </div>
+
+</div>
+
+</div>
+
+
+<!-- VIEWER -->
+
+<div id="viewer"
+     class="viewer hidden">
+
+<div class="viewer-top">
+
+    <div id="viewerTitle"
+         class="viewer-title">
+    </div>
+
+    <button class="close"
+            onclick="closeViewer()">
+        ✕ CLOSE
+    </button>
+
+</div>
+
+<div id="viewerContent"
+     class="viewer-content">
+</div>
+
+</div>
+
+
+<script>
+
+/* =====================================
+   SUPABASE CONNECTION
+   ===================================== */
+
+const SUPABASE_URL =
+"https://ideybsdiuabphlfbryfs.supabase.co";
+
+const SUPABASE_KEY =
+"sb_publishable_uE7figdEJpuwdQnwSL1uRA_4NveZaDj";
+
+const supabaseClient =
+supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+);
+
+
+/* =====================================
+   SCREEN SWITCHING
+   ===================================== */
+
+function showSignup() {
+
+    document.getElementById("loginScreen")
+        .classList.add("hidden");
+
+    document.getElementById("signupScreen")
+        .classList.remove("hidden");
+}
+
+
+function showLogin() {
+
+    document.getElementById("signupScreen")
+        .classList.add("hidden");
+
+    document.getElementById("loginScreen")
+        .classList.remove("hidden");
+}
+
+
+/* =====================================
+   SIGN UP
+   ===================================== */
+
+async function signup() {
+
+    const email =
+        document.getElementById("signupEmail")
+        .value.trim();
+
+    const password =
+        document.getElementById("signupPassword")
+        .value;
+
+    const confirm =
+        document.getElementById("signupConfirm")
+        .value;
+
+    const message =
+        document.getElementById("signupMessage");
+
+
+    if (!email || !password || !confirm) {
+
+        message.textContent =
+            "Please fill all fields.";
+
+        return;
+    }
+
+
+    if (password.length < 8) {
+
+        message.textContent =
+            "Password must be at least 8 characters.";
+
+        return;
+    }
+
+
+    if (password !== confirm) {
+
+        message.textContent =
+            "Passwords do not match.";
+
+        return;
+    }
+
+
+    message.textContent =
+        "Creating account...";
+
+
+    const { error } =
+        await supabaseClient.auth.signUp({
+            email: email,
+            password: password
+        });
+
+
+    if (error) {
+
+        message.textContent =
+            error.message;
+
+        return;
+    }
+
+
+    message.textContent =
+        "Account created! Check your email to confirm it.";
+}
+
+
+/* =====================================
+   LOGIN
+   ===================================== */
+
+async function login() {
+
+    const email =
+        document.getElementById("loginEmail")
+        .value.trim();
+
+    const password =
+        document.getElementById("loginPassword")
+        .value;
+
+    const message =
+        document.getElementById("loginMessage");
+
+
+    message.textContent =
+        "Logging in...";
+
+
+    const { data, error } =
+        await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+
+
+    if (error) {
+
+        message.textContent =
+            error.message;
+
+        return;
+    }
+
+
+    openDashboard(data.user);
+}
+
+
+/* =====================================
+   DASHBOARD
+   ===================================== */
+
+function openDashboard(user) {
+
+    document.getElementById("loginScreen")
+        .classList.add("hidden");
+
+    document.getElementById("signupScreen")
+        .classList.add("hidden");
+
+    document.getElementById("dashboard")
+        .classList.remove("hidden");
+
+    document.getElementById("userEmail")
+        .textContent = user.email;
+
+    loadFiles();
+}
+
+
+async function logout() {
+
+    await supabaseClient.auth.signOut();
+
+    document.getElementById("dashboard")
+        .classList.add("hidden");
+
+    document.getElementById("loginScreen")
+        .classList.remove("hidden");
+}
+
+
+/* =====================================
+   FILE PICKER
+   ===================================== */
+
+function chooseFiles() {
+
+    document.getElementById("fileInput").click();
+}
+
+
+/* =====================================
+   UPLOAD FILES
+   ===================================== */
+
+async function uploadFiles() {
+
+    const input =
+        document.getElementById("fileInput");
+
+    const selectedFiles =
+        input.files;
+
+
+    if (!selectedFiles.length)
+        return;
+
+
+    const {
+        data: { user }
+    } = await supabaseClient.auth.getUser();
+
+
+    if (!user) {
+
+        alert("Please login again.");
+
+        return;
+    }
+
+
+    for (const file of selectedFiles) {
+
+        const filePath =
+            user.id + "/" +
+            Date.now() + "_" +
+            file.name;
+
+
+        const { error } =
+            await supabaseClient.storage
+            .from("locker-files")
+            .upload(filePath, file);
+
+
+        if (error) {
+
+            alert(
+                "Upload failed: " +
+                error.message
+            );
+
+        }
+
+    }
+
+
+    input.value = "";
+
+    loadFiles();
+}
+
+
+/* =====================================
+   LOAD FILES
+   ===================================== */
+
+async function loadFiles() {
+
+    const grid =
+        document.getElementById("fileGrid");
+
+
+    grid.innerHTML =
+        '<div class="empty">Loading...</div>';
+
+
+    const {
+        data: { user }
+    } = await supabaseClient.auth.getUser();
+
+
+    if (!user) return;
+
+
+    const { data, error } =
+        await supabaseClient.storage
+        .from("locker-files")
+        .list(user.id);
+
+
+    if (error) {
+
+        grid.innerHTML =
+            '<div class="empty">' +
+            escapeHTML(error.message) +
+            '</div>';
+
+        return;
+    }
+
+
+    grid.innerHTML = "";
+
+
+    if (!data || data.length === 0) {
+
+        grid.innerHTML =
+            '<div class="empty">No files yet.</div>';
+
+        return;
+    }
+
+
+    data.forEach(file => {
+
+        const card =
+            document.createElement("div");
+
+        card.className =
+            "file-card";
+
+
+        const fullPath =
+            user.id + "/" + file.name;
+
+
+        card.innerHTML = `
+
+            <div class="file-icon">
+                ${getIcon(file.name)}
+            </div>
+
+            <div class="file-name">
+                ${escapeHTML(file.name)}
+            </div>
+
+            <div class="file-size">
+                ${formatSize(file.metadata?.size)}
+            </div>
+
+            <div class="file-actions">
+
+                <button class="open-btn"
+                        onclick='openFile(${JSON.stringify(fullPath)}, ${JSON.stringify(file.name)})'>
+                    OPEN
+                </button>
+
+                <button class="delete-btn"
+                        onclick='deleteFile(${JSON.stringify(fullPath)})'>
+                    DELETE
+                </button>
+
+            </div>
+        `;
+
+
+        grid.appendChild(card);
+
+    });
+}
+
+
+/* =====================================
+   OPEN FILE
+   ===================================== */
+
+async function openFile(path, name) {
+
+    const {
+        data,
+        error
+    } = await supabaseClient.storage
+        .from("locker-files")
+        .createSignedUrl(path, 3600);
+
+
+    if (error) {
+
+        alert(error.message);
+
+        return;
+    }
+
+
+    const url = data.signedUrl;
+
+
+    const viewer =
+        document.getElementById("viewer");
+
+    const title =
+        document.getElementById("viewerTitle");
+
+    const content =
+        document.getElementById("viewerContent");
+
+
+    viewer.classList.remove("hidden");
+
+    title.textContent = name;
+
+    content.innerHTML = "";
+
+
+    const lower =
+        name.toLowerCase();
+
+
+    if (
+        lower.endsWith(".jpg") ||
+        lower.endsWith(".jpeg") ||
+        lower.endsWith(".png") ||
+        lower.endsWith(".gif") ||
+        lower.endsWith(".webp")
+    ) {
+
+        const img =
+            document.createElement("img");
+
+        img.src = url;
+
+        content.appendChild(img);
+
+    }
+
+
+    else if (
+        lower.endsWith(".mp4") ||
+        lower.endsWith(".webm") ||
+        lower.endsWith(".mov") ||
+        lower.endsWith(".ogg")
+    ) {
+
+        const video =
+            document.createElement("video");
+
+        video.src = url;
+        video.controls = true;
+        video.autoplay = true;
+
+        content.appendChild(video);
+
+    }
+
+
+    else if (lower.endsWith(".pdf")) {
+
+        const iframe =
+            document.createElement("iframe");
+
+        iframe.src = url;
+
+        content.appendChild(iframe);
+
+    }
+
+
+    else {
+
+        const link =
+            document.createElement("a");
+
+        link.href = url;
+        link.target = "_blank";
+        link.textContent =
+            "OPEN / DOWNLOAD FILE";
+
+        link.style.color = "white";
+        link.style.padding = "15px";
+
+        content.appendChild(link);
+    }
+}
+
+
+/* =====================================
+   CLOSE VIEWER
+   ===================================== */
+
+function closeViewer() {
+
+    document.getElementById("viewer")
+        .classList.add("hidden");
+
+    document.getElementById("viewerContent")
+        .innerHTML = "";
+}
+
+
+/* =====================================
+   DELETE FILE
+   ===================================== */
+
+async function deleteFile(path) {
+
+    if (!confirm("Delete this file?"))
+        return;
+
+
+    const { error } =
+        await supabaseClient.storage
+        .from("locker-files")
+        .remove([path]);
+
+
+    if (error) {
+
+        alert(error.message);
+
+        return;
+    }
+
+
+    loadFiles();
+}
+
+
+/* =====================================
+   HELPERS
+   ===================================== */
+
+function getIcon(name) {
+
+    const n =
+        name.toLowerCase();
+
+
+    if (
+        n.endsWith(".jpg") ||
+        n.endsWith(".jpeg") ||
+        n.endsWith(".png") ||
+        n.endsWith(".gif") ||
+        n.endsWith(".webp")
+    )
+        return "🖼️";
+
+
+    if (
+        n.endsWith(".mp4") ||
+        n.endsWith(".webm") ||
+        n.endsWith(".mov") ||
+        n.endsWith(".ogg")
+    )
+        return "🎥";
+
+
+    if (n.endsWith(".pdf"))
+        return "📄";
+
+
+    return "📁";
+}
+
+
+function formatSize(bytes) {
+
+    if (!bytes)
+        return "";
+
+
+    if (bytes < 1024)
+        return bytes + " B";
+
+
+    if (bytes < 1024 * 1024)
+        return (
+            (bytes / 1024).toFixed(1)
+            + " KB"
+        );
+
+
+    return (
+        (bytes / (1024 * 1024)).toFixed(1)
+        + " MB"
+    );
+}
+
+
+function escapeHTML(text) {
+
+    const div =
+        document.createElement("div");
+
+    div.textContent = text;
+
+    return div.innerHTML;
+}
+
+
+/* =====================================
+   CHECK EXISTING LOGIN
+   ===================================== */
+
+async function checkLogin() {
+
+    const {
+        data: { session }
+    } = await supabaseClient.auth.getSession();
+
+
+    if (session) {
+
+        openDashboard(session.user);
+
+    }
+
+}
+
+
+checkLogin();
+
+</script>
+
+</body>
+</html>    border: 1px solid #333;
     border-radius: 25px;
     background: rgba(15,15,15,.92);
     box-shadow: 0 0 50px rgba(255,255,255,.08);
