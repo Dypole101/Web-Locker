@@ -3,38 +3,938 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Locker</title>
+<title>MY LOCKER</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
 * {
     box-sizing: border-box;
-    margin: 0;
-    padding: 0;
 }
 
 body {
+    margin: 0;
     min-height: 100vh;
     font-family: Arial, sans-serif;
     color: white;
     background:
-        radial-gradient(circle at 10% 10%, #252525, transparent 30%),
-        radial-gradient(circle at 90% 90%, #191919, transparent 30%),
-        #000;
+        radial-gradient(circle at 20% 10%, #222 0, transparent 30%),
+        radial-gradient(circle at 80% 90%, #151515 0, transparent 35%),
+        #050505;
 }
 
-.screen {
-    min-height: 100vh;
-    padding: 20px;
+.container {
+    width: 92%;
+    max-width: 900px;
+    margin: auto;
+    padding: 35px 0;
 }
 
-.center {
+.lock {
+    font-size: 55px;
+    text-align: center;
+    margin-top: 10px;
+}
+
+h1 {
+    text-align: center;
+    font-size: 38px;
+    letter-spacing: 5px;
+    margin: 10px 0 35px;
+}
+
+.card {
+    background: rgba(25,25,25,.85);
+    border: 1px solid #333;
+    border-radius: 22px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 15px 50px rgba(0,0,0,.5);
+}
+
+h2 {
+    margin-top: 0;
+}
+
+input {
+    width: 100%;
+    padding: 15px;
+    margin: 8px 0;
+    border-radius: 12px;
+    border: 1px solid #444;
+    background: #101010;
+    color: white;
+    font-size: 16px;
+    outline: none;
+}
+
+input:focus {
+    border-color: #777;
+}
+
+button {
+    padding: 14px 20px;
+    border: none;
+    border-radius: 12px;
+    background: white;
+    color: black;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 6px 3px;
+}
+
+button:hover {
+    opacity: .85;
+}
+
+.secondary {
+    background: #222;
+    color: white;
+    border: 1px solid #444;
+}
+
+.danger {
+    background: #7a2020;
+    color: white;
+}
+
+#app {
+    display: none;
+}
+
+.file {
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 15px;
+    padding: 15px;
+    margin: 10px 0;
 }
 
+.file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-buttons {
+    display: flex;
+    flex-shrink: 0;
+}
+
+#message {
+    text-align: center;
+    margin: 15px 0;
+    min-height: 20px;
+}
+
+.user {
+    color: #aaa;
+    margin-bottom: 15px;
+}
+
+#fileInput {
+    display: none;
+}
+
+.upload {
+    display: block;
+    text-align: center;
+    padding: 18px;
+    border: 2px dashed #444;
+    border-radius: 15px;
+    cursor: pointer;
+    margin-bottom: 15px;
+}
+
+.upload:hover {
+    border-color: white;
+}
+
+.empty {
+    text-align: center;
+    color: #777;
+    padding: 25px;
+}
+
+.preview {
+    width: 100%;
+    max-height: 500px;
+    object-fit: contain;
+    border-radius: 12px;
+    background: black;
+}
+
+video.preview {
+    max-height: 500px;
+}
+
+iframe.preview {
+    height: 600px;
+    border: none;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.9);
+    z-index: 999;
+    padding: 20px;
+    overflow: auto;
+}
+
+.modal-content {
+    max-width: 900px;
+    margin: 30px auto;
+}
+
+.close {
+    float: right;
+    font-size: 30px;
+    cursor: pointer;
+}
+
+@media(max-width:600px) {
+    h1 {
+        font-size: 28px;
+    }
+
+    .file {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .file-buttons {
+        width: 100%;
+    }
+
+    .file-buttons button {
+        flex: 1;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="lock">🔐</div>
+<h1>MY LOCKER</h1>
+
+<!-- LOGIN / SIGNUP -->
+<div id="auth" class="card">
+
+    <h2 id="authTitle">Login</h2>
+
+    <input
+        id="email"
+        type="email"
+        placeholder="Email"
+        autocomplete="email"
+    >
+
+    <input
+        id="password"
+        type="password"
+        placeholder="Password (8+ characters)"
+        autocomplete="current-password"
+    >
+
+    <input
+        id="name"
+        type="text"
+        placeholder="Your name"
+        style="display:none"
+    >
+
+    <button onclick="login()">Login</button>
+
+    <button class="secondary" onclick="toggleSignup()">
+        Create account
+    </button>
+
+    <div id="message"></div>
+
+</div>
+
+
+<!-- MAIN APP -->
+<div id="app">
+
+    <div class="card">
+
+        <h2>🔒 My Locker</h2>
+
+        <div class="user">
+            Logged in as:
+            <span id="userEmail"></span>
+        </div>
+
+        <label class="upload" for="fileInput">
+            📁 Choose PDF / Photo / Video
+        </label>
+
+        <input
+            id="fileInput"
+            type="file"
+            accept="image/*,video/*,application/pdf"
+            multiple
+            onchange="uploadFiles()"
+        >
+
+        <button class="secondary" onclick="logout()">
+            Logout
+        </button>
+
+    </div>
+
+
+    <div class="card">
+
+        <h2>📂 My Files</h2>
+
+        <div id="files">
+            <div class="empty">Loading...</div>
+        </div>
+
+    </div>
+
+</div>
+
+</div>
+
+
+<!-- PREVIEW MODAL -->
+<div id="modal" class="modal">
+
+    <div class="modal-content">
+
+        <span class="close" onclick="closePreview()">✕</span>
+
+        <div id="preview"></div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+/* =====================================================
+   SUPABASE SETTINGS
+   =====================================================
+
+   PUT YOUR SAME SUPABASE VALUES HERE.
+*/
+
+const SUPABASE_URL = "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
+
+const SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE";
+
+
+/* =====================================================
+   SUPABASE CONNECTION
+   ===================================================== */
+
+const supabaseClient =
+    window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
+    );
+
+
+let signupMode = false;
+
+
+/* =====================================================
+   MESSAGE
+   ===================================================== */
+
+function showMessage(text) {
+    document.getElementById("message").textContent = text;
+}
+
+
+/* =====================================================
+   TOGGLE SIGNUP
+   ===================================================== */
+
+function toggleSignup() {
+
+    signupMode = !signupMode;
+
+    const title =
+        document.getElementById("authTitle");
+
+    const name =
+        document.getElementById("name");
+
+    const button =
+        document.querySelector("#auth button");
+
+    if (signupMode) {
+
+        title.textContent = "Create Account";
+
+        name.style.display = "block";
+
+        button.textContent = "Create Account";
+
+    } else {
+
+        title.textContent = "Login";
+
+        name.style.display = "none";
+
+        button.textContent = "Login";
+
+    }
+
+    showMessage("");
+
+}
+
+
+/* =====================================================
+   LOGIN
+   ===================================================== */
+
+async function login() {
+
+    if (signupMode) {
+
+        await signup();
+
+        return;
+    }
+
+    const email =
+        document.getElementById("email").value.trim();
+
+    const password =
+        document.getElementById("password").value;
+
+
+    if (!email || !password) {
+
+        showMessage("Enter email and password.");
+
+        return;
+    }
+
+
+    if (password.length < 8) {
+
+        showMessage("Password must be at least 8 characters.");
+
+        return;
+    }
+
+
+    showMessage("Logging in...");
+
+
+    const { data, error } =
+        await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+
+
+    if (error) {
+
+        showMessage(error.message);
+
+        return;
+    }
+
+
+    showApp(data.user);
+}
+
+
+/* =====================================================
+   SIGN UP
+   ===================================================== */
+
+async function signup() {
+
+    const email =
+        document.getElementById("email").value.trim();
+
+    const password =
+        document.getElementById("password").value;
+
+    const name =
+        document.getElementById("name").value.trim();
+
+
+    if (!email || !password || !name) {
+
+        showMessage("Fill in all fields.");
+
+        return;
+    }
+
+
+    if (password.length < 8) {
+
+        showMessage(
+            "Password must be at least 8 characters."
+        );
+
+        return;
+    }
+
+
+    showMessage("Creating account...");
+
+
+    const { data, error } =
+        await supabaseClient.auth.signUp({
+
+            email: email,
+
+            password: password,
+
+            options: {
+                data: {
+                    display_name: name
+                }
+            }
+
+        });
+
+
+    if (error) {
+
+        showMessage(error.message);
+
+        return;
+    }
+
+
+    showMessage(
+        "Account created! Check your email to confirm it."
+    );
+
+}
+
+
+/* =====================================================
+   SHOW APP
+   ===================================================== */
+
+function showApp(user) {
+
+    document.getElementById("auth").style.display =
+        "none";
+
+    document.getElementById("app").style.display =
+        "block";
+
+    document.getElementById("userEmail").textContent =
+        user.email;
+
+    loadFiles();
+
+}
+
+
+/* =====================================================
+   LOGOUT
+   ===================================================== */
+
+async function logout() {
+
+    await supabaseClient.auth.signOut();
+
+    location.reload();
+
+}
+
+
+/* =====================================================
+   UPLOAD FILES
+   ===================================================== */
+
+async function uploadFiles() {
+
+    const input =
+        document.getElementById("fileInput");
+
+    const files = input.files;
+
+
+    if (!files.length) return;
+
+
+    const {
+        data: { user }
+    } = await supabaseClient.auth.getUser();
+
+
+    if (!user) {
+
+        alert("Please login first.");
+
+        return;
+    }
+
+
+    for (const file of files) {
+
+        showMessage(
+            "Uploading " + file.name + "..."
+        );
+
+
+        /*
+          Each user gets their own folder:
+
+          USER-ID / filename
+        */
+
+        const path =
+            user.id + "/" + Date.now() + "_" + file.name;
+
+
+        const { error } =
+            await supabaseClient.storage
+                .from("locker-files")
+                .upload(path, file);
+
+
+        if (error) {
+
+            alert(
+                "Upload failed: " +
+                error.message
+            );
+
+        }
+
+    }
+
+
+    input.value = "";
+
+    showMessage("Upload complete.");
+
+    loadFiles();
+
+}
+
+
+/* =====================================================
+   LOAD FILES
+   ===================================================== */
+
+async function loadFiles() {
+
+    const {
+        data: { user }
+    } = await supabaseClient.auth.getUser();
+
+
+    if (!user) return;
+
+
+    const filesDiv =
+        document.getElementById("files");
+
+
+    filesDiv.innerHTML =
+        '<div class="empty">Loading...</div>';
+
+
+    const { data, error } =
+        await supabaseClient.storage
+            .from("locker-files")
+            .list(user.id, {
+                limit: 100,
+                sortBy: {
+                    column: "created_at",
+                    order: "desc"
+                }
+            });
+
+
+    if (error) {
+
+        filesDiv.innerHTML =
+            "<div class='empty'>" +
+            error.message +
+            "</div>";
+
+        return;
+    }
+
+
+    if (!data || data.length === 0) {
+
+        filesDiv.innerHTML =
+            '<div class="empty">No files yet.</div>';
+
+        return;
+    }
+
+
+    filesDiv.innerHTML = "";
+
+
+    data.forEach(file => {
+
+        if (!file.name) return;
+
+
+        const fullPath =
+            user.id + "/" + file.name;
+
+
+        const div =
+            document.createElement("div");
+
+        div.className = "file";
+
+
+        const name =
+            document.createElement("div");
+
+        name.className = "file-name";
+
+        name.textContent =
+            "📄 " + file.name;
+
+
+        const buttons =
+            document.createElement("div");
+
+        buttons.className =
+            "file-buttons";
+
+
+        const openButton =
+            document.createElement("button");
+
+        openButton.textContent =
+            "Open";
+
+        openButton.onclick =
+            () => openFile(fullPath, file.name);
+
+
+        const deleteButton =
+            document.createElement("button");
+
+        deleteButton.textContent =
+            "Delete";
+
+        deleteButton.className =
+            "danger";
+
+        deleteButton.onclick =
+            () => deleteFile(fullPath);
+
+
+        buttons.appendChild(openButton);
+
+        buttons.appendChild(deleteButton);
+
+
+        div.appendChild(name);
+
+        div.appendChild(buttons);
+
+
+        filesDiv.appendChild(div);
+
+    });
+
+}
+
+
+/* =====================================================
+   OPEN FILE
+   ===================================================== */
+
+async function openFile(path, fileName) {
+
+    const { data, error } =
+        await supabaseClient.storage
+            .from("locker-files")
+            .createSignedUrl(path, 3600);
+
+
+    if (error) {
+
+        alert(error.message);
+
+        return;
+    }
+
+
+    const url = data.signedUrl;
+
+
+    const preview =
+        document.getElementById("preview");
+
+
+    const modal =
+        document.getElementById("modal");
+
+
+    preview.innerHTML = "";
+
+
+    const lower =
+        fileName.toLowerCase();
+
+
+    if (
+        lower.endsWith(".jpg") ||
+        lower.endsWith(".jpeg") ||
+        lower.endsWith(".png") ||
+        lower.endsWith(".gif") ||
+        lower.endsWith(".webp")
+    ) {
+
+        const img =
+            document.createElement("img");
+
+        img.src = url;
+
+        img.className = "preview";
+
+        preview.appendChild(img);
+
+    }
+
+    else if (
+        lower.endsWith(".mp4") ||
+        lower.endsWith(".webm") ||
+        lower.endsWith(".ogg") ||
+        lower.endsWith(".mov")
+    ) {
+
+        const video =
+            document.createElement("video");
+
+        video.src = url;
+
+        video.controls = true;
+
+        video.className = "preview";
+
+        preview.appendChild(video);
+
+    }
+
+    else if (lower.endsWith(".pdf")) {
+
+        const iframe =
+            document.createElement("iframe");
+
+        iframe.src = url;
+
+        iframe.className = "preview";
+
+        preview.appendChild(iframe);
+
+    }
+
+    else {
+
+        window.open(url, "_blank");
+
+        return;
+    }
+
+
+    modal.style.display = "block";
+
+}
+
+
+/* =====================================================
+   CLOSE PREVIEW
+   ===================================================== */
+
+function closePreview() {
+
+    document.getElementById("modal").style.display =
+        "none";
+
+    document.getElementById("preview").innerHTML =
+        "";
+
+}
+
+
+/* =====================================================
+   DELETE FILE
+   ===================================================== */
+
+async function deleteFile(path) {
+
+    if (!confirm("Delete this file?")) {
+
+        return;
+    }
+
+
+    const { error } =
+        await supabaseClient.storage
+            .from("locker-files")
+            .remove([path]);
+
+
+    if (error) {
+
+        alert(error.message);
+
+        return;
+    }
+
+
+    loadFiles();
+
+}
+
+
+/* =====================================================
+   CHECK EXISTING LOGIN
+   ===================================================== */
+
+async function checkUser() {
+
+    const {
+        data: { user }
+    } = await supabaseClient.auth.getUser();
+
+
+    if (user) {
+
+        showApp(user);
+
+    }
+
+}
+
+
+checkUser();
+
+</script>
+
+</body>
+</html>
 .box {
     width: 100%;
     max-width: 420px;
