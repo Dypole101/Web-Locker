@@ -1,23 +1,120 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html><html>
 <head>
-    <title>My Locker</title>
-</head>
-<body>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black Locker</title><style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
 
-    <h1>🔐 MY LOCKER</h1>
-    <p>Your private digital locker</p>
+    body {
+        min-height: 100vh;
+        font-family: Arial, sans-serif;
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background:
+            radial-gradient(circle at top, #222 0%, #080808 45%, #000 100%);
+        overflow: hidden;
+    }
 
-    <h2>Login</h2>
+    .background {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background:
+            radial-gradient(circle at 20% 30%, rgba(255,255,255,0.05), transparent 25%),
+            radial-gradient(circle at 80% 70%, rgba(255,255,255,0.04), transparent 25%);
+        pointer-events: none;
+    }
 
-    <input type="text" placeholder="Username">
-    <br><br>
+    .locker {
+        width: 90%;
+        max-width: 420px;
+        padding: 35px 28px;
+        border: 1px solid #333;
+        border-radius: 25px;
+        background: rgba(15, 15, 15, 0.85);
+        box-shadow: 0 0 50px rgba(255,255,255,0.08);
+        backdrop-filter: blur(15px);
+        text-align: center;
+    }
 
-    <input type="password" placeholder="Password">
-    <br><br>
+    .lock {
+        font-size: 55px;
+        margin-bottom: 15px;
+    }
 
-    <button>Login</button>
-    <button>Create Account</button>
+    h1 {
+        font-size: 30px;
+        letter-spacing: 4px;
+    }
 
-</body>
+    .subtitle {
+        color: #888;
+        margin: 10px 0 30px;
+    }
+
+    input {
+        width: 100%;
+        padding: 15px;
+        margin: 8px 0;
+        border: 1px solid #333;
+        border-radius: 12px;
+        background: #090909;
+        color: white;
+        outline: none;
+        font-size: 15px;
+    }
+
+    input:focus {
+        border-color: #777;
+        box-shadow: 0 0 15px rgba(255,255,255,0.08);
+    }
+
+    button {
+        width: 100%;
+        padding: 15px;
+        margin-top: 12px;
+        border: none;
+        border-radius: 12px;
+        background: white;
+        color: black;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: 0.25s;
+    }
+
+    button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(255,255,255,0.15);
+    }
+
+    .create {
+        background: #181818;
+        color: white;
+        border: 1px solid #333;
+    }
+</style>
+
+</head><body><div class="background"></div><div class="locker"><div class="lock">🔐</div>
+
+<h1>MY LOCKER</h1>
+
+<p class="subtitle">
+    Your private digital vault
+</p>
+
+<input type="text" placeholder="Username">
+
+<input type="password" placeholder="Password">
+
+<button>LOGIN</button>
+
+<button class="create">CREATE ACCOUNT</button>
+
+</div></body>
 </html>
