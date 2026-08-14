@@ -1,8 +1,332 @@
-<html>
-    <head>
-        <title>snake</title>
-    </head>
-    <body>
-        hiii
-    </body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Multiplayer Snake Web Game</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+  <style>
+    * { box-sizing: border-box; touch-action: none; user-select: none; margin: 0; padding: 0; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background: #111; color: #fff; font-family: sans-serif; }
+    
+    #lobby {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, 0.9); z-index: 10; gap: 15px;
+    }
+    .btn { padding: 12px 24px; font-size: 18px; font-weight: bold; color: #fff; background: #28a745; border: none; border-radius: 6px; cursor: pointer; }
+    .btn:disabled { background: #555; cursor: not-allowed; }
+    
+    #game-container { position: relative; width: 100vw; height: 100vh; }
+    canvas { display: block; background: #1b1b1b; }
+
+    #hud {
+      position: absolute; top: 10px; left: 10px; right: 10px;
+      display: flex; justify-content: space-between; font-size: 18px; font-weight: bold; pointer-events: none;
+    }
+
+    #joystick-zone {
+      position: absolute; bottom: 30px; left: 30px; width: 120px; height: 120px; z-index: 5;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Lobby Screen -->
+  <div id="lobby">
+    <h1>Multiplayer Snake</h1>
+    <p>Room Capacity: <span id="player-count">0</span>/5 Players</p>
+    <p>Ready Players: <span id="ready-count">0</span></p>
+    <button id="ready-btn" class="btn">Ready</button>
+  </div>
+
+  <!-- Game Canvas & HUD -->
+  <div id="game-container">
+    <div id="hud">
+      <div id="timer-display">Time: 02:00</div>
+      <div id="score-display">Score: 0</div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="joystick-zone"></div>
+  </div>
+
+<script>
+  // --- SUPABASE CONFIGURATION ---
+  const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // --- GAME CONSTANTS & STATE ---
+  const myId = "player_" + Math.random().toString(36).substring(2, 9);
+  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+  
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+  
+  let channel;
+  let players = {};
+  let food = { x: 400, y: 300 };
+  let isReady = false;
+  let gameActive = false;
+  let myScore = 0;
+  let gameTimer = 120;
+  let timerInterval;
+
+  const COLORS = ["#FF5733", "#33FF57", "#3357FF", "#F3FF33", "#FF33F3"];
+  let myColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  // Local Snake Physics State
+  let mySnake = {
+    x: Math.random() * (canvas.width - 100) + 50,
+    y: Math.random() * (canvas.height - 100) + 50,
+    vx: 0, vy: 0,
+    speed: 3,
+    size: 10,
+    trail: [],
+    dead: false
+  };
+
+  // --- CONTROLS SETUP ---
+  let mousePos = { x: mySnake.x, y: mySnake.y };
+
+  if (!isMobile) {
+    document.getElementById("joystick-zone").style.display = "none";
+    window.addEventListener("mousemove", (e) => {
+      mousePos.x = e.clientX;
+      mousePos.y = e.clientY;
+    });
+  } else {
+    const manager = nipplejs.create({
+      zone: document.getElementById("joystick-zone"),
+      mode: "static",
+      position: { left: "60px", bottom: "60px" },
+      color: "white"
+    });
+
+    manager.on("move", (evt, data) => {
+      if (data.vector) {
+        mySnake.vx = data.vector.x * mySnake.speed;
+        mySnake.vy = -data.vector.y * mySnake.speed;
+      }
+    });
+
+    manager.on("end", () => {
+      mySnake.vx = 0;
+      mySnake.vy = 0;
+    });
+  }
+
+  // --- REALTIME LOBBY & NETWORKING ---
+  function initRealtime() {
+    channel = supabase.channel("snake_room_1", {
+      config: { presence: { key: myId } }
+    });
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState();
+        const count = Object.keys(state).length;
+        document.getElementById("player-count").innerText = count;
+
+        let readyNum = 0;
+        for (let id in state) {
+          if (state[id][0] && state[id][0].ready) readyNum++;
+        }
+        document.getElementById("ready-count").innerText = readyNum;
+
+        // Auto Start Game when 2+ players are ready or all present are ready
+        if (readyNum > 0 && readyNum === count && !gameActive) {
+          startGame();
+        }
+      })
+      .on("broadcast", { event: "move" }, ({ payload }) => {
+        if (payload.id !== myId) {
+          players[payload.id] = payload;
+        }
+      })
+      .on("broadcast", { event: "food" }, ({ payload }) => {
+        food = payload;
+      })
+      .on("broadcast", { event: "kill" }, ({ payload }) => {
+        if (payload.victimId === myId) handleDeath();
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({ ready: false, color: myColor });
+        }
+      });
+  }
+
+  // Ready Button Event
+  document.getElementById("ready-btn").addEventListener("click", async () => {
+    isReady = !isReady;
+    document.getElementById("ready-btn").innerText = isReady ? "Cancel Ready" : "Ready";
+    await channel.track({ ready: isReady, color: myColor });
+  });
+
+  // --- GAME LOGIC ---
+  function startGame() {
+    gameActive = true;
+    document.getElementById("lobby").style.display = "none";
+
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      gameTimer--;
+      let m = Math.floor(gameTimer / 60).toString().padStart(2, "0");
+      let s = (gameTimer % 60).toString().padStart(2, "0");
+      document.getElementById("timer-display").innerText = `Time: ${m}:${s}`;
+
+      if (gameTimer <= 0) {
+        clearInterval(timerInterval);
+        gameActive = false;
+        alert(`Game Over! Final Score: ${myScore}`);
+        location.reload();
+      }
+    }, 1000);
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function handleDeath() {
+    mySnake.dead = true;
+    mySnake.trail = [];
+    setTimeout(() => {
+      mySnake.x = Math.random() * (canvas.width - 100) + 50;
+      mySnake.y = Math.random() * (canvas.height - 100) + 50;
+      mySnake.dead = false;
+    }, 3000);
+  }
+
+  function gameLoop() {
+    if (!gameActive) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!mySnake.dead) {
+      // Steering Math
+      if (!isMobile) {
+        let dx = mousePos.x - mySnake.x;
+        let dy = mousePos.y - mySnake.y;
+        let dist = Math.hypot(dx, dy);
+        if (dist > 5) {
+          mySnake.vx = (dx / dist) * mySnake.speed;
+          mySnake.vy = (dy / dist) * mySnake.speed;
+        } else {
+          mySnake.vx = 0; mySnake.vy = 0;
+        }
+      }
+
+      // Update position
+      mySnake.x += mySnake.vx;
+      mySnake.y += mySnake.vy;
+
+      // Keep inside screen bounds
+      mySnake.x = Math.max(10, Math.min(canvas.width - 10, mySnake.x));
+      mySnake.y = Math.max(10, Math.min(canvas.height - 10, mySnake.y));
+
+      // Append trail body segment
+      mySnake.trail.push({ x: mySnake.x, y: mySnake.y });
+      while (mySnake.trail.length > mySnake.size) {
+        mySnake.trail.shift();
+      }
+
+      // Food Collision
+      if (Math.hypot(mySnake.x - food.x, mySnake.y - food.y) < 15) {
+        myScore += 10;
+        mySnake.size += 5;
+        document.getElementById("score-display").innerText = `Score: ${myScore}`;
+        
+        // Spawn food globally after 1 sec
+        setTimeout(() => {
+          let newFood = {
+            x: Math.floor(Math.random() * (canvas.width - 40)) + 20,
+            y: Math.floor(Math.random() * (canvas.height - 40)) + 20
+          };
+          channel.send({ type: "broadcast", event: "food", payload: newFood });
+        }, 1000);
+      }
+
+      // Snake-on-Snake Collision Check
+      for (let id in players) {
+        let p = players[id];
+        if (p.trail && !p.dead) {
+          for (let seg of p.trail) {
+            if (Math.hypot(mySnake.x - seg.x, mySnake.y - seg.y) < 8) {
+              handleDeath();
+              break;
+            }
+          }
+        }
+      }
+
+      // Broadcast Movement
+      channel.send({
+        type: "broadcast",
+        event: "move",
+        payload: {
+          id: myId,
+          x: mySnake.x,
+          y: mySnake.y,
+          trail: mySnake.trail,
+          color: myColor,
+          dead: mySnake.dead
+        }
+      });
+    }
+
+    // --- RENDER ELEMENTS ---
+    // Draw Food
+    ctx.fillStyle = "#FF0000";
+    ctx.beginPath();
+    ctx.arc(food.x, food.y, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw PC Direction Line Indicator
+    if (!isMobile && !mySnake.dead) {
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(mySnake.x, mySnake.y);
+      ctx.lineTo(mousePos.x, mousePos.y);
+      ctx.stroke();
+    }
+
+    // Draw Remote Players
+    for (let id in players) {
+      let p = players[id];
+      if (!p.dead && p.trail) {
+        ctx.fillStyle = p.color;
+        p.trail.forEach(pt => {
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+    }
+
+    // Draw Own Snake
+    if (!mySnake.dead) {
+      ctx.fillStyle = myColor;
+      mySnake.trail.forEach(pt => {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // Initialize Connection
+  initRealtime();
+</script>
+</body>
 </html>
