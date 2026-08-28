@@ -23,7 +23,6 @@ window.addEventListener('unhandledrejection', function (e) {
   const root = document.getElementById('root');
   const DB_NAME = 'fileLockerMultiUserDB';
   const DB_VERSION = 1;
-  const ADMIN_EMAIL = 'anshithrahman123@gmail.com';
   let db = null;
   let currentUser = null; // { username, isAdmin }
 
@@ -317,21 +316,12 @@ window.addEventListener('unhandledrejection', function (e) {
           createdAt: new Date().toISOString()
         });
 
-        const subject = encodeURIComponent('New file locker access request: ' + username);
-        const body = encodeURIComponent(
-          'A new account request was made for your file locker.\n\n' +
-          'Username: ' + username + '\n' +
-          'Requested: ' + new Date().toLocaleString() + '\n\n' +
-          'Open the locker app, log in as the owner, and go to Admin > Pending Requests to approve or reject it.'
-        );
-        window.location.href = `mailto:${ADMIN_EMAIL}?subject=${subject}&body=${body}`;
-
         fadeSwap(`
           <div class="lk-center">
             <div class="lk-card">
               <div class="lk-logo">📨</div>
               <p class="lk-title">Request sent</p>
-              <p class="lk-sub">We opened your email app with a notification for the locker owner. Your account will work once they approve it in the app.</p>
+              <p class="lk-sub">Your account request has been sent to the locker owner. It'll be ready once they approve it from the Admin panel.</p>
               <button class="lk-btn" id="lk-back2">Back to log in</button>
             </div>
           </div>
@@ -496,7 +486,7 @@ window.addEventListener('unhandledrejection', function (e) {
       pendingListEl.innerHTML = '<div class="lk-empty">No pending requests.</div>';
     } else {
       pendingListEl.innerHTML = pending.map(u => `
-        <div class="lk-pending-row" data-username="${u.username}">
+      <div class="lk-pending-row" data-username="${u.username}">
           <div>
             <div class="lk-pending-name">${escapeHtml(u.displayName)}<span class="lk-tag lk-tag-pending">Pending</span></div>
             <div class="lk-pending-date">Requested ${new Date(u.createdAt).toLocaleString()}</div>
@@ -550,3 +540,4 @@ window.addEventListener('unhandledrejection', function (e) {
     }
   })();
 })();
+     
