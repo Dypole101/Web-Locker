@@ -119,26 +119,27 @@
   }
 
   .lk-file-row {
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
     background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-    padding: 13px 14px; margin-bottom: 8px;
+    padding: 13px 14px; margin-bottom: 8px; gap: 8px;
     animation: fadeSlideUp 0.3s ease both;
     transition: border-color 0.15s, transform 0.15s;
   }
   .lk-file-row:hover { border-color: #33394a; }
   .lk-file-row.lk-removing { animation: fadeIn 0.2s reverse both; }
-  .lk-file-info { min-width: 0; flex: 1; margin-right: 10px; display: flex; align-items: center; gap: 10px; }
+  .lk-file-info { min-width: 0; flex: 1 1 160px; margin-right: 10px; display: flex; align-items: center; gap: 10px; }
   .lk-file-icon { font-size: 20px; flex-shrink: 0; }
   .lk-file-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lk-file-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .lk-file-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .lk-file-actions { display: flex; gap: 6px; flex-shrink: 0; }
   .lk-icon-btn {
     background: #0c0e14; border: 1px solid var(--border); color: var(--text);
-    border-radius: 9px; padding: 7px 11px; font-size: 12px; cursor: pointer;
+    border-radius: 9px; padding: 7px 9px; font-size: 12px; cursor: pointer;
     transition: border-color 0.15s, transform 0.1s;
   }
   .lk-icon-btn:active { transform: scale(0.95); }
   .lk-icon-btn:hover { border-color: var(--accent); }
+  .lk-icon-btn.lk-open:hover { border-color: var(--success); color: var(--success); }
   .lk-icon-btn.lk-del:hover { border-color: var(--danger); color: var(--danger); }
   .lk-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 36px 0; animation: fadeIn 0.3s ease both; }
 
@@ -172,4 +173,4 @@
   }
   .lk-tag-admin { background: rgba(155,108,255,0.15); color: #c3aaff; }
   .lk-tag-pending { background: rgba(255,196,0,0.15); color: #ffd866; }
-                                 
+      
