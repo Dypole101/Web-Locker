@@ -184,6 +184,28 @@
 <body>
 <div id="root"></div>
 <script>
+window.addEventListener('error', function (e) {
+  var root = document.getElementById('root');
+  if (root) {
+    root.innerHTML = '<div style="max-width:500px;margin:60px auto;padding:20px;font-family:sans-serif;color:#eee;background:#171b26;border:1px solid #ff6c6c;border-radius:12px;">' +
+      '<h3 style="margin-top:0;color:#ff6c6c;">Something broke while loading</h3>' +
+      '<pre style="white-space:pre-wrap;font-size:12px;color:#ffb3b3;">' +
+      (e.message || 'Unknown error') + (e.filename ? ('\n' + e.filename + ':' + e.lineno) : '') +
+      '</pre></div>';
+  }
+});
+window.addEventListener('unhandledrejection', function (e) {
+  var root = document.getElementById('root');
+  if (root && !root.querySelector('h3')) {
+    root.innerHTML = '<div style="max-width:500px;margin:60px auto;padding:20px;font-family:sans-serif;color:#eee;background:#171b26;border:1px solid #ff6c6c;border-radius:12px;">' +
+      '<h3 style="margin-top:0;color:#ff6c6c;">Something broke while loading</h3>' +
+      '<pre style="white-space:pre-wrap;font-size:12px;color:#ffb3b3;">' +
+      (e.reason && e.reason.message ? e.reason.message : String(e.reason)) +
+      '</pre></div>';
+  }
+});
+</script>
+<script>
 (function () {
   const root = document.getElementById('root');
   const DB_NAME = 'fileLockerMultiUserDB';
@@ -440,25 +462,4 @@
           <div class="lk-logo">✨</div>
           <p class="lk-title">Create an account</p>
           <p class="lk-sub">Your request goes to the locker owner for approval before you can log in.</p>
-          <input id="lk-username" class="lk-input" type="text" placeholder="Choose a username" autocomplete="username" />
-          <input id="lk-password" class="lk-input" type="password" placeholder="Choose a password" autocomplete="new-password" />
-          <input id="lk-password2" class="lk-input" type="password" placeholder="Confirm password" />
-          <p class="lk-error" id="lk-err"></p>
-          <button class="lk-btn" id="lk-request">Request Access</button>
-          <button class="lk-link-btn" id="lk-back">Back to log in</button>
-        </div>
-      </div>
-    `);
-
-    document.getElementById('lk-back').addEventListener('click', renderHome);
-    const errEl = document.getElementById('lk-err');
-    const btn = document.getElementById('lk-request');
-
-    btn.addEventListener('click', async () => {
-      const username = document.getElementById('lk-username').value.trim();
-      const password = document.getElementById('lk-password').value;
-      const password2 = document.getElementById('lk-password2').value;
-      errEl.textContent = '';
-
-      if (!username || username.length < 2) { errEl.textContent = 'Choose a username (2+ characters).'; shakeError(errEl); return; }
-      if (password.length < 4) { errEl.textContent = 'Use a password with 4+ characters.'; shakeErr
+          <input id="lk-username" class="lk-input" type="text" placeholder="Choose a username" autocom
