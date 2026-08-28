@@ -199,12 +199,6 @@ window.addEventListener('unhandledrejection', function (e) {
           setLoading(loginBtn, false);
           return;
         }
-        if (user.status === 'rejected') {
-          errEl.textContent = 'This account request was not approved.';
-          shakeError(errEl);
-          setLoading(loginBtn, false);
-          return;
-        }
         currentUser = { username: user.username, displayName: user.displayName, isAdmin: !!user.isAdmin };
         renderLocker();
       } catch (e) {
@@ -427,13 +421,31 @@ window.addEventListener('unhandledrejection', function (e) {
           </div>
         </div>
         <div class="lk-file-actions">
+          <button class="lk-icon-btn lk-open" data-id="${f.id}">Open</button>
           <button class="lk-icon-btn lk-download" data-id="${f.id}">Download</button>
           <button class="lk-icon-btn lk-del" data-id="${f.id}">Delete</button>
         </div>
       </div>
     `).join('');
+    listEl.querySelectorAll('.lk-open').forEach(btn => btn.addEventListener('click', () => openFile(btn.dataset.id)));
     listEl.querySelectorAll('.lk-download').forEach(btn => btn.addEventListener('click', () => downloadFile(btn.dataset.id)));
     listEl.querySelectorAll('.lk-del').forEach(btn => btn.addEventListener('click', () => deleteFile(btn.dataset.id)));
+  }
+
+  async function openFile(id) {
+    try {
+      const record = await idbGet('files', id);
+      if (!record) throw new Error('Not found');
+      const url = URL.createObjectURL(record.blob);
+      const win = window.open(url, '_blank');
+      if (!win) {
+        toast('Your browser blocked the popup — allow popups to open files');
+      }
+      // Give the new tab time to load the blob before we release it.
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      toast('Could not open that file');
+    }
   }
 
   async function downloadFile(id) {
@@ -466,7 +478,7 @@ window.addEventListener('unhandledrejection', function (e) {
   async function renderAdmin() {
     const users = await idbGetAll('users');
     const pending = users.filter(u => u.status === 'pending');
-    const others = users.filter(u => u.status !== 'pending' && u.username !== currentUser.username);
+    const others = users.filter(u => u.status === 'approved' && u.username !== currentUser.username);
 
     fadeSwap(`
       <div class="lk-topbar">
@@ -486,7 +498,7 @@ window.addEventListener('unhandledrejection', function (e) {
       pendingListEl.innerHTML = '<div class="lk-empty">No pending requests.</div>';
     } else {
       pendingListEl.innerHTML = pending.map(u => `
-      <div class="lk-pending-row" data-username="${u.username}">
+        <div class="lk-pending-row" data-username="${u.username}">
           <div>
             <div class="lk-pending-name">${escapeHtml(u.displayName)}<span class="lk-tag lk-tag-pending">Pending</span></div>
             <div class="lk-pending-date">Requested ${new Date(u.createdAt).toLocaleString()}</div>
@@ -499,11 +511,17 @@ window.addEventListener('unhandledrejection', function (e) {
       `).join('');
       pendingListEl.querySelectorAll('button[data-action]').forEach(btn => {
         btn.addEventListener('click', async () => {
-          const user = await idbGet('users', btn.dataset.username);
-          if (!user) return;
-          user.status = btn.dataset.action;
-          await idbPut('users', user);
-          toast(btn.dataset.action === 'approved' ? 'Account approved' : 'Account rejected');
+          if (btn.dataset.action === 'approved') {
+            const user = await idbGet('users', btn.dataset.username);
+            if (!user) return;
+            user.status = 'approved';
+            await idbPut('users', user);
+            toast('Account approved');
+          } else {
+            // Reject = remove the request entirely, freeing the username for reuse.
+            await idbDelete('users', btn.dataset.username);
+            toast('Request rejected and username freed');
+          }
           renderAdmin();
         });
       });
@@ -515,7 +533,7 @@ window.addEventListener('unhandledrejection', function (e) {
         <div class="lk-pending-row">
           <div>
             <div class="lk-pending-name">${escapeHtml(u.displayName)}${u.isAdmin ? '<span class="lk-tag lk-tag-admin">Owner</span>' : ''}</div>
-            <div class="lk-pending-date">${u.status === 'rejected' ? 'Rejected' : 'Approved'}</div>
+            <div class="lk-pending-date">Approved</div>
           </div>
         </div>
       `).join('');
@@ -540,4 +558,3 @@ window.addEventListener('unhandledrejection', function (e) {
     }
   })();
 })();
-     
