@@ -6,64 +6,179 @@
 <title>File Locker</title>
 <style>
   :root {
-    --bg: #0f1115;
-    --card: #171a21;
-    --border: #262b36;
-    --text: #e8eaf0;
-    --muted: #9aa1b1;
+    --bg: #0b0d12;
+    --bg-2: #12151d;
+    --card: #171b26;
+    --border: #262c3a;
+    --text: #eef0f5;
+    --muted: #96a0b5;
     --accent: #6c8cff;
+    --accent-2: #9b6cff;
     --accent-hover: #85a1ff;
     --danger: #ff6c6c;
+    --success: #5fd694;
   }
   * { box-sizing: border-box; }
   html, body {
-    margin: 0;
-    padding: 0;
-    background: var(--bg);
+    margin: 0; padding: 0; min-height: 100%;
+    background: radial-gradient(1200px 600px at 50% -10%, #1a2036 0%, var(--bg) 60%);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    min-height: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
-  #root { padding: 24px 16px; }
-  .lk-center { display: flex; align-items: center; justify-content: center; min-height: 70vh; }
-  .lk-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 100%; max-width: 380px; margin: 0 auto; }
-  .lk-title { font-size: 20px; font-weight: 600; margin: 0 0 6px 0; }
-  .lk-sub { color: var(--muted); font-size: 13px; margin: 0 0 20px 0; line-height: 1.5; }
-  .lk-input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: #0d0f14; color: var(--text); font-size: 15px; margin-bottom: 10px; outline: none; }
-  .lk-input:focus { border-color: var(--accent); }
-  .lk-btn { width: 100%; padding: 12px 14px; border-radius: 10px; border: none; background: var(--accent); color: white; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; }
-  .lk-btn:hover { background: var(--accent-hover); }
-  .lk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .lk-btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
-  .lk-error { color: var(--danger); font-size: 13px; margin: -4px 0 10px 0; min-height: 16px; }
-  .lk-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; max-width: 640px; margin-left: auto; margin-right: auto; }
+  #root { padding: 24px 16px; min-height: 100vh; }
+
+  @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes popIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes shake { 10%,90% { transform: translateX(-1px); } 20%,80% { transform: translateX(2px); } 30%,50%,70% { transform: translateX(-4px); } 40%,60% { transform: translateX(4px); } }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+  .lk-center { display: flex; align-items: center; justify-content: center; min-height: 74vh; }
+  .lk-card {
+    background: linear-gradient(180deg, var(--card), var(--bg-2));
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 30px;
+    width: 100%;
+    max-width: 380px;
+    margin: 0 auto;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.6);
+    animation: fadeSlideUp 0.4s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .lk-logo {
+    width: 46px; height: 46px; border-radius: 13px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; margin-bottom: 16px;
+    animation: popIn 0.5s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .lk-title { font-size: 21px; font-weight: 700; margin: 0 0 6px 0; letter-spacing: -0.02em; }
+  .lk-sub { color: var(--muted); font-size: 13px; margin: 0 0 22px 0; line-height: 1.55; }
+  .lk-input {
+    width: 100%; padding: 13px 14px; border-radius: 11px;
+    border: 1px solid var(--border); background: #0c0e14; color: var(--text);
+    font-size: 15px; margin-bottom: 10px; outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .lk-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,140,255,0.15); }
+  .lk-btn {
+    width: 100%; padding: 13px 14px; border-radius: 11px; border: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: white; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 6px;
+    transition: transform 0.12s, filter 0.15s, opacity 0.15s;
+    position: relative; overflow: hidden;
+  }
+  .lk-btn:hover { filter: brightness(1.08); }
+  .lk-btn:active { transform: scale(0.97); }
+  .lk-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .lk-btn.lk-loading { color: transparent; }
+  .lk-btn.lk-loading::after {
+    content: ''; position: absolute; width: 16px; height: 16px;
+    top: 50%; left: 50%; margin: -8px 0 0 -8px;
+    border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+  }
+  .lk-btn-secondary {
+    background: transparent; border: 1px solid var(--border); color: var(--text);
+  }
+  .lk-btn-secondary:hover { border-color: var(--accent); }
+  .lk-link-btn {
+    background: none; border: none; color: var(--accent); font-size: 13px;
+    cursor: pointer; text-align: center; width: 100%; margin-top: 16px; padding: 6px;
+    transition: color 0.15s;
+  }
+  .lk-link-btn:hover { color: var(--accent-hover); }
+  .lk-error {
+    color: var(--danger); font-size: 13px; margin: -2px 0 8px 0; min-height: 16px;
+  }
+  .lk-error.lk-shake { animation: shake 0.4s; }
+  .lk-success-text { color: var(--success); font-size: 13px; margin: -2px 0 8px 0; }
+
+  .lk-topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 22px; max-width: 640px; margin-left: auto; margin-right: auto;
+    animation: fadeSlideUp 0.35s ease both;
+  }
+  .lk-user-badge { display: flex; align-items: center; gap: 8px; }
+  .lk-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: white; flex-shrink: 0;
+  }
+  .lk-topbar-actions { display: flex; gap: 8px; }
   .lk-app { max-width: 640px; margin: 0 auto; }
-  .lk-drop { border: 2px dashed var(--border); border-radius: 14px; padding: 28px; text-align: center; color: var(--muted); margin-bottom: 20px; cursor: pointer; transition: border-color 0.15s; display: block; }
-  .lk-drop:hover, .lk-drop.lk-drag { border-color: var(--accent); color: var(--text); }
-  .lk-file-input-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
+
+  .lk-drop {
+    border: 2px dashed var(--border); border-radius: 16px; padding: 30px;
+    text-align: center; color: var(--muted); margin-bottom: 20px; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
+    display: block; animation: fadeSlideUp 0.4s 0.05s ease both;
   }
-  .lk-file-row { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
-  .lk-file-info { min-width: 0; flex: 1; margin-right: 10px; }
+  .lk-drop:active { transform: scale(0.99); }
+  .lk-drop:hover, .lk-drop.lk-drag { border-color: var(--accent); color: var(--text); background: rgba(108,140,255,0.05); }
+  .lk-drop-icon { font-size: 26px; margin-bottom: 8px; }
+  .lk-file-input-hidden {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  .lk-file-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 13px 14px; margin-bottom: 8px;
+    animation: fadeSlideUp 0.3s ease both;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .lk-file-row:hover { border-color: #33394a; }
+  .lk-file-row.lk-removing { animation: fadeIn 0.2s reverse both; }
+  .lk-file-info { min-width: 0; flex: 1; margin-right: 10px; display: flex; align-items: center; gap: 10px; }
+  .lk-file-icon { font-size: 20px; flex-shrink: 0; }
   .lk-file-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lk-file-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .lk-file-actions { display: flex; gap: 8px; flex-shrink: 0; }
-  .lk-icon-btn { background: #0d0f14; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 7px 10px; font-size: 12px; cursor: pointer; }
+  .lk-icon-btn {
+    background: #0c0e14; border: 1px solid var(--border); color: var(--text);
+    border-radius: 9px; padding: 7px 11px; font-size: 12px; cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s;
+  }
+  .lk-icon-btn:active { transform: scale(0.95); }
   .lk-icon-btn:hover { border-color: var(--accent); }
   .lk-icon-btn.lk-del:hover { border-color: var(--danger); color: var(--danger); }
-  .lk-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 30px 0; }
-  .lk-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #23283a; border: 1px solid var(--border); color: var(--text); padding: 10px 18px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 999; }
-  .lk-toast.show { opacity: 1; }
-  .lk-progress { font-size: 12px; color: var(--muted); margin-top: -6px; margin-bottom: 10px; }
+  .lk-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 36px 0; animation: fadeIn 0.3s ease both; }
+
+  .lk-toast {
+    position: fixed; bottom: 22px; left: 50%; background: #1e2432; border: 1px solid var(--border);
+    color: var(--text); padding: 11px 18px; border-radius: 12px; font-size: 13px;
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); z-index: 999; opacity: 0; pointer-events: none;
+  }
+  .lk-toast.show { animation: toastIn 0.3s cubic-bezier(.2,.8,.2,1) both; }
+
+  .lk-progress { font-size: 12px; color: var(--muted); margin: -8px 0 12px 0; display: flex; align-items: center; gap: 8px; }
+  .lk-spinner { width: 13px; height: 13px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; flex-shrink: 0; }
   .lk-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 18px; line-height: 1.5; }
+
+  .lk-pending-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 8px; animation: fadeSlideUp 0.3s ease both;
+  }
+  .lk-pending-name { font-size: 14px; font-weight: 600; }
+  .lk-pending-date { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .lk-pending-actions { display: flex; gap: 6px; }
+  .lk-approve { background: rgba(95,214,148,0.12); border-color: rgba(95,214,148,0.4); color: var(--success); }
+  .lk-approve:hover { border-color: var(--success); }
+  .lk-reject { background: rgba(255,108,108,0.1); border-color: rgba(255,108,108,0.35); color: var(--danger); }
+  .lk-reject:hover { border-color: var(--danger); }
+
+  .lk-tag {
+    display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 7px; border-radius: 6px; text-transform: uppercase; margin-left: 6px;
+  }
+  .lk-tag-admin { background: rgba(155,108,255,0.15); color: #c3aaff; }
+  .lk-tag-pending { background: rgba(255,196,0,0.15); color: #ffd866; }
 </style>
 </head>
 <body>
@@ -71,9 +186,11 @@
 <script>
 (function () {
   const root = document.getElementById('root');
-  const DB_NAME = 'fileLockerDB';
+  const DB_NAME = 'fileLockerMultiUserDB';
   const DB_VERSION = 1;
+  const ADMIN_EMAIL = 'anshithrahman123@gmail.com';
   let db = null;
+  let currentUser = null; // { username, isAdmin }
 
   // ---------- IndexedDB helpers ----------
 
@@ -82,11 +199,12 @@
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = (e) => {
         const database = e.target.result;
-        if (!database.objectStoreNames.contains('meta')) {
-          database.createObjectStore('meta', { keyPath: 'key' });
+        if (!database.objectStoreNames.contains('users')) {
+          database.createObjectStore('users', { keyPath: 'username' });
         }
         if (!database.objectStoreNames.contains('files')) {
-          database.createObjectStore('files', { keyPath: 'id' });
+          const store = database.createObjectStore('files', { keyPath: 'id' });
+          store.createIndex('owner', 'owner', { unique: false });
         }
       };
       req.onsuccess = (e) => resolve(e.target.result);
@@ -94,37 +212,39 @@
     });
   }
 
+  function tx(storeName, mode) { return db.transaction(storeName, mode).objectStore(storeName); }
+
   function idbGet(storeName, key) {
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(storeName, 'readonly');
-      const req = tx.objectStore(storeName).get(key);
+      const req = tx(storeName, 'readonly').get(key);
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => reject(req.error);
     });
   }
-
   function idbPut(storeName, value) {
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(storeName, 'readwrite');
-      const req = tx.objectStore(storeName).put(value);
+      const req = tx(storeName, 'readwrite').put(value);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
   }
-
   function idbDelete(storeName, key) {
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(storeName, 'readwrite');
-      const req = tx.objectStore(storeName).delete(key);
+      const req = tx(storeName, 'readwrite').delete(key);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
   }
-
   function idbGetAll(storeName) {
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(storeName, 'readonly');
-      const req = tx.objectStore(storeName).getAll();
+      const req = tx(storeName, 'readonly').getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  function idbGetAllByIndex(storeName, indexName, value) {
+    return new Promise((resolve, reject) => {
+      const req = tx(storeName, 'readonly').index(indexName).getAll(value);
       req.onsuccess = () => resolve(req.result || []);
       req.onerror = () => reject(req.error);
     });
@@ -141,13 +261,13 @@
       document.body.appendChild(t);
     }
     t.textContent = msg;
+    t.classList.remove('show');
+    void t.offsetWidth;
     t.classList.add('show');
     clearTimeout(t._timer);
-    t._timer = setTimeout(() => t.classList.remove('show'), 2200);
+    t._timer = setTimeout(() => { t.classList.remove('show'); }, 2400);
   }
 
-  // Simple, dependency-free hash. Not cryptographic-grade, but this is a
-  // lightweight personal locker rather than a high-security vault.
   function simpleHash(text) {
     let h1 = 0xdeadbeef ^ text.length;
     let h2 = 0x41c6ce57 ^ text.length;
@@ -168,222 +288,177 @@
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
   }
-
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
   }
+  function fileIcon(type) {
+    if (type.startsWith('image/')) return '🖼️';
+    if (type.startsWith('video/')) return '🎬';
+    if (type.startsWith('audio/')) return '🎵';
+    if (type.includes('pdf')) return '📕';
+    if (type.includes('zip') || type.includes('compressed')) return '🗜️';
+    return '📄';
+  }
+  function shakeError(el) {
+    el.classList.remove('lk-shake');
+    void el.offsetWidth;
+    el.classList.add('lk-shake');
+  }
+  function setLoading(btn, loading) {
+    btn.disabled = loading;
+    btn.classList.toggle('lk-loading', loading);
+  }
+  function fadeSwap(html) {
+    root.style.animation = 'none';
+    void root.offsetWidth;
+    root.innerHTML = html;
+  }
 
   // ---------- Screens ----------
 
-  async function renderAuthScreen() {
-    let existing = null;
-    try {
-      existing = await idbGet('meta', 'auth');
-    } catch (e) {
-      existing = null;
+  async function renderHome() {
+    const users = await idbGetAll('users');
+    if (users.length === 0) {
+      renderFirstRunSetup();
+      return;
     }
-    const isSetup = !existing;
-
-    root.innerHTML = `
+    fadeSwap(`
       <div class="lk-center">
         <div class="lk-card">
-          <p class="lk-title">${isSetup ? 'Create a password' : 'Enter password'}</p>
-          <p class="lk-sub">${isSetup
-            ? 'Set a password to protect your file locker. You will need it every time you open this page on this device.'
-            : 'This locker is protected. Enter your password to view and manage your files.'}</p>
-          <input id="lk-pass" class="lk-input" type="password" placeholder="Password" autocomplete="${isSetup ? 'new-password' : 'current-password'}" />
-          ${isSetup ? '<input id="lk-pass2" class="lk-input" type="password" placeholder="Confirm password" />' : ''}
+          <div class="lk-logo">🔐</div>
+          <p class="lk-title">Welcome back</p>
+          <p class="lk-sub">Log in to your personal file locker.</p>
+          <input id="lk-username" class="lk-input" type="text" placeholder="Username" autocomplete="username" />
+          <input id="lk-password" class="lk-input" type="password" placeholder="Password" autocomplete="current-password" />
           <p class="lk-error" id="lk-err"></p>
-          <button class="lk-btn" id="lk-submit">${isSetup ? 'Create & Unlock' : 'Unlock'}</button>
-          <p class="lk-note">Files are stored on this device, in this browser. Keep this file saved somewhere you'll open it from consistently.</p>
+          <button class="lk-btn" id="lk-login">Log In</button>
+          <button class="lk-link-btn" id="lk-goto-signup">New here? Create an account</button>
         </div>
       </div>
-    `;
+    `);
 
     const errEl = document.getElementById('lk-err');
-    const submit = document.getElementById('lk-submit');
-    const passEl = document.getElementById('lk-pass');
+    const loginBtn = document.getElementById('lk-login');
+    const uEl = document.getElementById('lk-username');
+    const pEl = document.getElementById('lk-password');
 
-    async function handleSubmit() {
-      const pass = passEl.value;
-      if (!pass) { errEl.textContent = 'Please enter a password.'; return; }
+    async function doLogin() {
+      const username = uEl.value.trim();
+      const password = pEl.value;
+      errEl.textContent = '';
+      if (!username || !password) { errEl.textContent = 'Enter your username and password.'; shakeError(errEl); return; }
 
-      submit.disabled = true;
+      setLoading(loginBtn, true);
       try {
-        if (isSetup) {
-          const pass2 = document.getElementById('lk-pass2').value;
-          if (pass.length < 4) { errEl.textContent = 'Use at least 4 characters.'; submit.disabled = false; return; }
-          if (pass !== pass2) { errEl.textContent = 'Passwords do not match.'; submit.disabled = false; return; }
-          await idbPut('meta', { key: 'auth', hash: simpleHash(pass) });
-          toast('Password set');
-          renderLocker();
-        } else {
-          if (simpleHash(pass) === existing.hash) {
-            renderLocker();
-          } else {
-            errEl.textContent = 'Incorrect password.';
-            submit.disabled = false;
-          }
+        const user = await idbGet('users', username.toLowerCase());
+        if (!user || simpleHash(password) !== user.hash) {
+          errEl.textContent = 'Incorrect username or password.';
+          shakeError(errEl);
+          setLoading(loginBtn, false);
+          return;
         }
+        if (user.status === 'pending') {
+          errEl.textContent = 'Your account is still waiting for approval.';
+          shakeError(errEl);
+          setLoading(loginBtn, false);
+          return;
+        }
+        if (user.status === 'rejected') {
+          errEl.textContent = 'This account request was not approved.';
+          shakeError(errEl);
+          setLoading(loginBtn, false);
+          return;
+        }
+        currentUser = { username: user.username, displayName: user.displayName, isAdmin: !!user.isAdmin };
+        renderLocker();
       } catch (e) {
-        errEl.textContent = 'Error: ' + (e && e.message ? e.message : 'please try again.');
-        submit.disabled = false;
+        errEl.textContent = 'Something went wrong. Try again.';
+        setLoading(loginBtn, false);
       }
     }
 
-    submit.addEventListener('click', handleSubmit);
-    passEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSubmit(); });
-    const pass2El = document.getElementById('lk-pass2');
-    if (pass2El) pass2El.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSubmit(); });
-    passEl.focus();
+    loginBtn.addEventListener('click', doLogin);
+    pEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+    document.getElementById('lk-goto-signup').addEventListener('click', renderSignup);
   }
 
-  async function renderLocker() {
-    root.innerHTML = `
-      <div class="lk-topbar">
-        <p class="lk-title" style="margin:0;">📁 My File Locker</p>
-        <button class="lk-btn lk-btn-secondary" id="lk-lock" style="width:auto;padding:8px 14px;font-size:13px;">Lock</button>
+  function renderFirstRunSetup() {
+    fadeSwap(`
+      <div class="lk-center">
+        <div class="lk-card">
+          <div class="lk-logo">🔐</div>
+          <p class="lk-title">Set up your locker</p>
+          <p class="lk-sub">You're the first person here, so this account becomes the owner/admin account. It's approved automatically and can approve future requests.</p>
+          <input id="lk-username" class="lk-input" type="text" placeholder="Choose a username" autocomplete="username" />
+          <input id="lk-password" class="lk-input" type="password" placeholder="Choose a password" autocomplete="new-password" />
+          <input id="lk-password2" class="lk-input" type="password" placeholder="Confirm password" />
+          <p class="lk-error" id="lk-err"></p>
+          <button class="lk-btn" id="lk-create-admin">Create Owner Account</button>
+        </div>
       </div>
-      <div class="lk-app">
-        <label class="lk-drop" id="lk-drop" for="lk-file-input">
-          <div>Tap to choose a file, or drag one here</div>
-          <div style="font-size:11px;margin-top:6px;">Stored locally on this device</div>
-        </label>
-        <input type="file" id="lk-file-input" class="lk-file-input-hidden" multiple />
-        <div class="lk-progress" id="lk-progress" style="display:none;"></div>
-        <div id="lk-file-list"></div>
-      </div>
-    `;
+    `);
 
-    document.getElementById('lk-lock').addEventListener('click', renderAuthScreen);
+    const errEl = document.getElementById('lk-err');
+    const btn = document.getElementById('lk-create-admin');
 
-    const dropEl = document.getElementById('lk-drop');
-    const inputEl = document.getElementById('lk-file-input');
-    dropEl.addEventListener('dragover', (e) => { e.preventDefault(); dropEl.classList.add('lk-drag'); });
-    dropEl.addEventListener('dragleave', () => dropEl.classList.remove('lk-drag'));
-    dropEl.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropEl.classList.remove('lk-drag');
-      if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
-    });
-    inputEl.addEventListener('change', (e) => {
-      if (e.target.files.length) handleFiles(e.target.files);
-      inputEl.value = '';
-    });
+    btn.addEventListener('click', async () => {
+      const username = document.getElementById('lk-username').value.trim();
+      const password = document.getElementById('lk-password').value;
+      const password2 = document.getElementById('lk-password2').value;
+      errEl.textContent = '';
 
-    await renderFileList();
-  }
+      if (!username || username.length < 2) { errEl.textContent = 'Choose a username (2+ characters).'; shakeError(errEl); return; }
+      if (password.length < 4) { errEl.textContent = 'Use a password with 4+ characters.'; shakeError(errEl); return; }
+      if (password !== password2) { errEl.textContent = 'Passwords do not match.'; shakeError(errEl); return; }
 
-  async function handleFiles(fileList) {
-    const progressEl = document.getElementById('lk-progress');
-    const files = Array.from(fileList);
-    for (const file of files) {
-      progressEl.style.display = 'block';
-      progressEl.textContent = `Saving ${file.name}...`;
+      setLoading(btn, true);
       try {
-        const id = 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-        await idbPut('files', {
-          id,
-          name: file.name,
-          size: file.size,
-          type: file.type || 'application/octet-stream',
-          date: new Date().toISOString(),
-          blob: file
+        await idbPut('users', {
+          username: username.toLowerCase(),
+          displayName: username,
+          hash: simpleHash(password),
+          isAdmin: true,
+          status: 'approved',
+          createdAt: new Date().toISOString()
         });
+        currentUser = { username: username.toLowerCase(), displayName: username, isAdmin: true };
+        toast('Owner account created');
+        renderLocker();
       } catch (e) {
-        toast(`Failed to save "${file.name}": ${e && e.message ? e.message : 'error'}`);
+        errEl.textContent = 'Could not create account. Try again.';
+        setLoading(btn, false);
       }
-    }
-    progressEl.style.display = 'none';
-    await renderFileList();
-    toast('Saved');
+    });
   }
 
-  async function renderFileList() {
-    const listEl = document.getElementById('lk-file-list');
-    let files = [];
-    try {
-      files = await idbGetAll('files');
-    } catch (e) {
-      listEl.innerHTML = '<div class="lk-empty">Could not load files.</div>';
-      return;
-    }
-
-    if (files.length === 0) {
-      listEl.innerHTML = '<div class="lk-empty">No files yet. Upload something above.</div>';
-      return;
-    }
-
-    files.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    listEl.innerHTML = files.map(f => `
-      <div class="lk-file-row" data-id="${f.id}">
-        <div class="lk-file-info">
-          <div class="lk-file-name">${escapeHtml(f.name)}</div>
-          <div class="lk-file-meta">${fmtSize(f.size)} · ${new Date(f.date).toLocaleDateString()}</div>
-        </div>
-        <div class="lk-file-actions">
-          <button class="lk-icon-btn lk-download" data-id="${f.id}">Download</button>
-          <button class="lk-icon-btn lk-del" data-id="${f.id}">Delete</button>
+  function renderSignup() {
+    fadeSwap(`
+      <div class="lk-center">
+        <div class="lk-card">
+          <div class="lk-logo">✨</div>
+          <p class="lk-title">Create an account</p>
+          <p class="lk-sub">Your request goes to the locker owner for approval before you can log in.</p>
+          <input id="lk-username" class="lk-input" type="text" placeholder="Choose a username" autocomplete="username" />
+          <input id="lk-password" class="lk-input" type="password" placeholder="Choose a password" autocomplete="new-password" />
+          <input id="lk-password2" class="lk-input" type="password" placeholder="Confirm password" />
+          <p class="lk-error" id="lk-err"></p>
+          <button class="lk-btn" id="lk-request">Request Access</button>
+          <button class="lk-link-btn" id="lk-back">Back to log in</button>
         </div>
       </div>
-    `).join('');
+    `);
 
-    listEl.querySelectorAll('.lk-download').forEach(btn => {
-      btn.addEventListener('click', () => downloadFile(btn.dataset.id));
-    });
-    listEl.querySelectorAll('.lk-del').forEach(btn => {
-      btn.addEventListener('click', () => deleteFile(btn.dataset.id));
-    });
-  }
+    document.getElementById('lk-back').addEventListener('click', renderHome);
+    const errEl = document.getElementById('lk-err');
+    const btn = document.getElementById('lk-request');
 
-  async function downloadFile(id) {
-    try {
-      const record = await idbGet('files', id);
-      if (!record) throw new Error('Not found');
-      const url = URL.createObjectURL(record.blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = record.name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-    } catch (e) {
-      toast('Could not download that file');
-    }
-  }
+    btn.addEventListener('click', async () => {
+      const username = document.getElementById('lk-username').value.trim();
+      const password = document.getElementById('lk-password').value;
+      const password2 = document.getElementById('lk-password2').value;
+      errEl.textContent = '';
 
-  async function deleteFile(id) {
-    try {
-      await idbDelete('files', id);
-      await renderFileList();
-      toast('File deleted');
-    } catch (e) {
-      toast('Could not delete that file');
-    }
-  }
-
-  // ---------- Init ----------
-
-  (async function init() {
-    try {
-      db = await openDB();
-      renderAuthScreen();
-    } catch (e) {
-      root.innerHTML = `
-        <div class="lk-center">
-          <div class="lk-card">
-            <p class="lk-title">Can't start locker</p>
-            <p class="lk-sub">This browser blocked local storage access, so the locker can't save anything here. Try opening this file directly in a standard mobile browser (like Chrome or Safari) instead of an in-app preview.</p>
-          </div>
-        </div>
-      `;
-    }
-  })();
-})();
-</script>
-</body>
-</html>
+      if (!username || username.length < 2) { errEl.textContent = 'Choose a username (2+ characters).'; shakeError(errEl); return; }
+      if (password.length < 4) { errEl.textContent = 'Use a password with 4+ characters.'; shakeErr
