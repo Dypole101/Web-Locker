@@ -1,1 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>File Locker</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #171a21;
+    --border: #262b36;
+    --text: #e8eaf0;
+    --muted: #9aa1b1;
+    --accent: #6c8cff;
+    --accent-hover: #85a1ff;
+    --danger: #ff6c6c;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100%;
+  }
+  #root { padding: 24px 16px; }
+  .lk-center { display: flex; align-items: center; justify-content: center; min-height: 70vh; }
+  .lk-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 100%; max-width: 380px; margin: 0 auto; }
+  .lk-title { font-size: 20px; font-weight: 600; margin: 0 0 6px 0; }
+  .lk-sub { color: var(--muted); font-size: 13px; margin: 0 0 20px 0; line-height: 1.5; }
+  .lk-input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: #0d0f14; color: var(--text); font-size: 15px; margin-bottom: 10px; outline: none; }
+  .lk-input:focus { border-color: var(--accent); }
+  .lk-btn { width: 100%; padding: 12px 14px; border-radius: 10px; border: none; background: var(--accent); color: white; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+  .lk-btn:hover { background: var(--accent-hover); }
+  .lk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .lk-btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .lk-error { color: var(--danger); font-size: 13px; margin: -4px 0 10px 0; min-height: 16px; }
+  .lk-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; max-width: 640px; margin-left: auto; margin-right: auto; }
+  .lk-app { max-width: 640px; margin: 0 auto; }
+  .lk-drop { border: 2px dashed var(--border); border-radius: 14px; padding: 28px; text-align: center; color: var(--muted); margin-bottom: 20px; cursor: pointer; transition: border-color 0.15s; display: block; }
+  .lk-drop:hover, .lk-drop.lk-drag { border-color: var(--accent); color: var(--text); }
+  .lk-file-input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .lk-file-row { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+  .lk-file-info { min-width: 0; flex: 1; margin-right: 10px; }
+  .lk-file-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lk-file-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .lk-file-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .lk-icon-btn { background: #0d0f14; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 7px 10px; font-size: 12px; cursor: pointer; }
+  .lk-icon-btn:hover { border-color: var(--accent); }
+  .lk-icon-btn.lk-del:hover { border-color: var(--danger); color: var(--danger); }
+  .lk-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 30px 0; }
+  .lk-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #23283a; border: 1px solid var(--border); color: var(--text); padding: 10px 18px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 999; }
+  .lk-toast.show { opacity: 1; }
+  .lk-progress { font-size: 12px; color: var(--muted); margin-top: -6px; margin-bottom: 10px; }
+  .lk-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 18px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function () {
+  const root = document.getElementById('root');
+  const DB_NAME = 'fileLockerDB';
+  const DB_VERSION = 1;
+  let db = null;
 
+  // ---------- IndexedDB helpers ----------
+
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const database = e.target.result;
+        if (!database.objectStoreNames.contains('meta')) {
+          database.createObjectStore('meta', { keyPath: 'key' });
+        }
+        if (!database.objectStoreNames.contains('files')) {
+          database.createObjectStore('files', { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = (e) => resolve(e.target.result);
+      req.onerror = () => reject(req.error || new Error('Could not open storage'));
+    });
+  }
+
+  function idbGet(storeName, key) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readonly');
+      const req = tx.objectStore(storeName).get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function idbPut(storeName, value) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readwrite');
+      const req = tx.objectStore(storeName).put(value);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function idbDelete(storeName, key) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readwrite');
+      const req = tx.objectStore(storeName).delete(key);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function idbGetAll(storeName) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readonly');
+      const req = tx.objectStore(storeName).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // ---------- Utilities ----------
+
+  function toast(msg) {
+    let t = document.getElementById('lk-toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'lk-toast';
+      t.className = 'lk-toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // Simple, dependency-free hash. Not cryptographic-grade, but this is a
+  // lightweight personal locker rather than a high-security vault.
+  function simpleHash(text) {
+    let h1 = 0xdeadbeef ^ text.length;
+    let h2 = 0x41c6ce57 ^ text.length;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+    h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+    h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+  }
+
+  function fmtSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ---------- Screens ----------
+
+  async function renderAuthScreen() {
+    let existing = null;
+    try {
+      existing = await idbGet('meta', 'auth');
+    } catch (e) {
+      existing = null;
+    }
+    const isSetup = !existing;
+
+    root.innerHTML = `
+      <div class="lk-center">
+        <div class="lk-card">
+          <p class="lk-title">${isSetup ? 'Create a password' : 'Enter password'}</p>
+          <p class="lk-sub">${isSetup
+            ? 'Set a password to protect your file locker. You will need it every time you open this page on this device.'
+            : 'This locker is protected. Enter your password to view and manage your files.'}</p>
+          <input id="lk-pass" class="lk-input" type="password" placeholder="Password" autocomplete="${isSetup ? 'new-password' : 'current-password'}" />
+          ${isSetup ? '<input id="lk-pass2" class="lk-input" type="password" placeholder="Confirm password" />' : ''}
+          <p class="lk-error" id="lk-err"></p>
+          <button class="lk-btn" id="lk-submit">${isSetup ? 'Create & Unlock' : 'Unlock'}</button>
+          <p class="lk-note">Files are stored on this device, in this browser. Keep this file saved somewhere you'll open it from consistently.</p>
+        </div>
+      </div>
+    `;
+
+    const errEl = document.getElementById('lk-err');
+    const submit = document.getElementById('lk-submit');
+    const passEl = document.getElementById('lk-pass');
+
+    async function handleSubmit() {
+      const pass = passEl.value;
+      if (!pass) { errEl.textContent = 'Please enter a password.'; return; }
+
+      submit.disabled = true;
+      try {
+        if (isSetup) {
+          const pass2 = document.getElementById('lk-pass2').value;
+          if (pass.length < 4) { errEl.textContent = 'Use at least 4 characters.'; submit.disabled = false; return; }
+          if (pass !== pass2) { errEl.textContent = 'Passwords do not match.'; submit.disabled = false; return; }
+          await idbPut('meta', { key: 'auth', hash: simpleHash(pass) });
+          toast('Password set');
+          renderLocker();
+        } else {
+          if (simpleHash(pass) === existing.hash) {
+            renderLocker();
+          } else {
+            errEl.textContent = 'Incorrect password.';
+            submit.disabled = false;
+          }
+        }
+      } catch (e) {
+        errEl.textContent = 'Error: ' + (e && e.message ? e.message : 'please try again.');
+        submit.disabled = false;
+      }
+    }
+
+    submit.addEventListener('click', handleSubmit);
+    passEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSubmit(); });
+    const pass2El = document.getElementById('lk-pass2');
+    if (pass2El) pass2El.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSubmit(); });
+    passEl.focus();
+  }
+
+  async function renderLocker() {
+    root.innerHTML = `
+      <div class="lk-topbar">
+        <p class="lk-title" style="margin:0;">📁 My File Locker</p>
+        <button class="lk-btn lk-btn-secondary" id="lk-lock" style="width:auto;padding:8px 14px;font-size:13px;">Lock</button>
+      </div>
+      <div class="lk-app">
+        <label class="lk-drop" id="lk-drop" for="lk-file-input">
+          <div>Tap to choose a file, or drag one here</div>
+          <div style="font-size:11px;margin-top:6px;">Stored locally on this device</div>
+        </label>
+        <input type="file" id="lk-file-input" class="lk-file-input-hidden" multiple />
+        <div class="lk-progress" id="lk-progress" style="display:none;"></div>
+        <div id="lk-file-list"></div>
+      </div>
+    `;
+
+    document.getElementById('lk-lock').addEventListener('click', renderAuthScreen);
+
+    const dropEl = document.getElementById('lk-drop');
+    const inputEl = document.getElementById('lk-file-input');
+    dropEl.addEventListener('dragover', (e) => { e.preventDefault(); dropEl.classList.add('lk-drag'); });
+    dropEl.addEventListener('dragleave', () => dropEl.classList.remove('lk-drag'));
+    dropEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropEl.classList.remove('lk-drag');
+      if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+    });
+    inputEl.addEventListener('change', (e) => {
+      if (e.target.files.length) handleFiles(e.target.files);
+      inputEl.value = '';
+    });
+
+    await renderFileList();
+  }
+
+  async function handleFiles(fileList) {
+    const progressEl = document.getElementById('lk-progress');
+    const files = Array.from(fileList);
+    for (const file of files) {
+      progressEl.style.display = 'block';
+      progressEl.textContent = `Saving ${file.name}...`;
+      try {
+        const id = 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        await idbPut('files', {
+          id,
+          name: file.name,
+          size: file.size,
+          type: file.type || 'application/octet-stream',
+          date: new Date().toISOString(),
+          blob: file
+        });
+      } catch (e) {
+        toast(`Failed to save "${file.name}": ${e && e.message ? e.message : 'error'}`);
+      }
+    }
+    progressEl.style.display = 'none';
+    await renderFileList();
+    toast('Saved');
+  }
+
+  async function renderFileList() {
+    const listEl = document.getElementById('lk-file-list');
+    let files = [];
+    try {
+      files = await idbGetAll('files');
+    } catch (e) {
+      listEl.innerHTML = '<div class="lk-empty">Could not load files.</div>';
+      return;
+    }
+
+    if (files.length === 0) {
+      listEl.innerHTML = '<div class="lk-empty">No files yet. Upload something above.</div>';
+      return;
+    }
+
+    files.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    listEl.innerHTML = files.map(f => `
+      <div class="lk-file-row" data-id="${f.id}">
+        <div class="lk-file-info">
+          <div class="lk-file-name">${escapeHtml(f.name)}</div>
+          <div class="lk-file-meta">${fmtSize(f.size)} · ${new Date(f.date).toLocaleDateString()}</div>
+        </div>
+        <div class="lk-file-actions">
+          <button class="lk-icon-btn lk-download" data-id="${f.id}">Download</button>
+          <button class="lk-icon-btn lk-del" data-id="${f.id}">Delete</button>
+        </div>
+      </div>
+    `).join('');
+
+    listEl.querySelectorAll('.lk-download').forEach(btn => {
+      btn.addEventListener('click', () => downloadFile(btn.dataset.id));
+    });
+    listEl.querySelectorAll('.lk-del').forEach(btn => {
+      btn.addEventListener('click', () => deleteFile(btn.dataset.id));
+    });
+  }
+
+  async function downloadFile(id) {
+    try {
+      const record = await idbGet('files', id);
+      if (!record) throw new Error('Not found');
+      const url = URL.createObjectURL(record.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = record.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (e) {
+      toast('Could not download that file');
+    }
+  }
+
+  async function deleteFile(id) {
+    try {
+      await idbDelete('files', id);
+      await renderFileList();
+      toast('File deleted');
+    } catch (e) {
+      toast('Could not delete that file');
+    }
+  }
+
+  // ---------- Init ----------
+
+  (async function init() {
+    try {
+      db = await openDB();
+      renderAuthScreen();
+    } catch (e) {
+      root.innerHTML = `
+        <div class="lk-center">
+          <div class="lk-card">
+            <p class="lk-title">Can't start locker</p>
+            <p class="lk-sub">This browser blocked local storage access, so the locker can't save anything here. Try opening this file directly in a standard mobile browser (like Chrome or Safari) instead of an in-app preview.</p>
+          </div>
+        </div>
+      `;
+    }
+  })();
+})();
+</script>
+</body>
+</html>
