@@ -481,4 +481,72 @@ window.addEventListener('unhandledrejection', function (e) {
     fadeSwap(`
       <div class="lk-topbar">
         <p class="lk-title" style="margin:0;">Admin · Pending Requests</p>
-        <button class="lk-btn lk-btn-secondary" id="lk-back-locker" style="width:auto;padding:8px 14px;font-size:13px;">Back</b
+        <button class="lk-btn lk-btn-secondary" id="lk-back-locker" style="width:auto;padding:8px 14px;font-size:13px;">Back</button>
+      </div>
+      <div class="lk-app">
+        <div id="lk-pending-list"></div>
+        ${others.length ? `<p class="lk-sub" style="margin:24px 0 10px 0;">Other accounts</p><div id="lk-others-list"></div>` : ''}
+      </div>
+    `);
+
+    document.getElementById('lk-back-locker').addEventListener('click', renderLocker);
+
+    const pendingListEl = document.getElementById('lk-pending-list');
+    if (pending.length === 0) {
+      pendingListEl.innerHTML = '<div class="lk-empty">No pending requests.</div>';
+    } else {
+      pendingListEl.innerHTML = pending.map(u => `
+        <div class="lk-pending-row" data-username="${u.username}">
+          <div>
+            <div class="lk-pending-name">${escapeHtml(u.displayName)}<span class="lk-tag lk-tag-pending">Pending</span></div>
+            <div class="lk-pending-date">Requested ${new Date(u.createdAt).toLocaleString()}</div>
+          </div>
+          <div class="lk-pending-actions">
+            <button class="lk-icon-btn lk-approve" data-username="${u.username}" data-action="approved">Approve</button>
+            <button class="lk-icon-btn lk-reject" data-username="${u.username}" data-action="rejected">Reject</button>
+          </div>
+        </div>
+      `).join('');
+      pendingListEl.querySelectorAll('button[data-action]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const user = await idbGet('users', btn.dataset.username);
+          if (!user) return;
+          user.status = btn.dataset.action;
+          await idbPut('users', user);
+          toast(btn.dataset.action === 'approved' ? 'Account approved' : 'Account rejected');
+          renderAdmin();
+        });
+      });
+    }
+
+    const othersListEl = document.getElementById('lk-others-list');
+    if (othersListEl) {
+      othersListEl.innerHTML = others.map(u => `
+        <div class="lk-pending-row">
+          <div>
+            <div class="lk-pending-name">${escapeHtml(u.displayName)}${u.isAdmin ? '<span class="lk-tag lk-tag-admin">Owner</span>' : ''}</div>
+            <div class="lk-pending-date">${u.status === 'rejected' ? 'Rejected' : 'Approved'}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
+  // ---------- Init ----------
+
+  (async function init() {
+    try {
+      db = await openDB();
+      renderHome();
+    } catch (e) {
+      root.innerHTML = `
+        <div class="lk-center">
+          <div class="lk-card">
+            <p class="lk-title">Can't start locker</p>
+            <p class="lk-sub">This browser blocked local storage access. Try opening this file in a standard browser like Chrome or Safari instead of an in-app preview.</p>
+          </div>
+        </div>
+      `;
+    }
+  })();
+})();
