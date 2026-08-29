@@ -21,70 +21,80 @@ window.addEventListener('unhandledrejection', function (e) {
 
 (function () {
   const root = document.getElementById('root');
-  const DB_NAME = 'fileLockerMultiUserDB';
-  const DB_VERSION = 1;
+  const SUPABASE_URL = 'https://fzdudyxrcpgtljzkrwfr.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_uYgxX-YWnAhT4FqloN9WdQ_JI_P1ckj';
+  const BUCKET = 'locker-files';
   const OWNER_USERNAME = 'anshith';
   const OWNER_DISPLAY_NAME = 'Anshith';
   const OWNER_PASSWORD = 'Anshith@17';
-  let db = null;
+  let sb = null;
   let currentUser = null; // { username, displayName, role: 'owner' | 'moderator' | 'member' }
 
-  // ---------- IndexedDB helpers ----------
+  // ---------- Supabase helpers ----------
 
-  function openDB() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = (e) => {
-        const database = e.target.result;
-        if (!database.objectStoreNames.contains('users')) {
-          database.createObjectStore('users', { keyPath: 'username' });
-        }
-        if (!database.objectStoreNames.contains('files')) {
-          const store = database.createObjectStore('files', { keyPath: 'id' });
-          store.createIndex('owner', 'owner', { unique: false });
-        }
-      };
-      req.onsuccess = (e) => resolve(e.target.result);
-      req.onerror = () => reject(req.error || new Error('Could not open storage'));
-    });
+  async function dbGetUser(username) {
+    const { data, error } = await sb.from('users').select('*').eq('username', username).maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+  async function dbGetAllUsers() {
+    const { data, error } = await sb.from('users').select('*');
+    if (error) throw error;
+    return data || [];
+  }
+  async function dbUpsertUser(user) {
+    const { error } = await sb.from('users').upsert(user);
+    if (error) throw error;
+  }
+  async function dbDeleteUser(username) {
+    const { error } = await sb.from('users').delete().eq('username', username);
+    if (error) throw error;
   }
 
-  function tx(storeName, mode) { return db.transaction(storeName, mode).objectStore(storeName); }
-
-  function idbGet(storeName, key) {
-    return new Promise((resolve, reject) => {
-      const req = tx(storeName, 'readonly').get(key);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error);
-    });
+  function encodeStoragePath(username, originalName) {
+    const uniqueId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    return `${username}/${uniqueId}--${encodeURIComponent(originalName)}`;
   }
-  function idbPut(storeName, value) {
-    return new Promise((resolve, reject) => {
-      const req = tx(storeName, 'readwrite').put(value);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
+  function parseStorageEntry(entry) {
+    const idx = entry.name.indexOf('--');
+    const originalName = idx >= 0 ? decodeURIComponent(entry.name.slice(idx + 2)) : entry.name;
+    return {
+      path: entry.name,
+      name: originalName,
+      size: (entry.metadata && entry.metadata.size) || 0,
+      type: (entry.metadata && entry.metadata.mimetype) || 'application/octet-stream',
+      date: entry.created_at || new Date().toISOString()
+    };
   }
-  function idbDelete(storeName, key) {
-    return new Promise((resolve, reject) => {
-      const req = tx(storeName, 'readwrite').delete(key);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+  async function storageUpload(username, file) {
+    const path = encodeStoragePath(username, file.name);
+    const { error } = await sb.storage.from(BUCKET).upload(path, file, {
+      contentType: file.type || 'application/octet-stream'
     });
+    if (error) throw error;
   }
-  function idbGetAll(storeName) {
-    return new Promise((resolve, reject) => {
-      const req = tx(storeName, 'readonly').getAll();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => reject(req.error);
-    });
+  async function storageList(username) {
+    const { data, error } = await sb.storage.from(BUCKET).list(username, { limit: 200 });
+    if (error) throw error;
+    return (data || []).filter(e => e.id).map(parseStorageEntry);
   }
-  function idbGetAllByIndex(storeName, indexName, value) {
-    return new Promise((resolve, reject) => {
-      const req = tx(storeName, 'readonly').index(indexName).getAll(value);
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => reject(req.error);
-    });
+  async function storageSignedUrl(username, path, downloadName) {
+    const fullPath = `${username}/${path}`;
+    const opts = downloadName ? { download: downloadName } : {};
+    const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(fullPath, 120, opts);
+    if (error) throw error;
+    return data.signedUrl;
+  }
+  async function storageRemove(username, path) {
+    const { error } = await sb.storage.from(BUCKET).remove([`${username}/${path}`]);
+    if (error) throw error;
+  }
+  async function storageRemoveAllForUser(username) {
+    const files = await storageList(username);
+    if (files.length) {
+      const { error } = await sb.storage.from(BUCKET).remove(files.map(f => `${username}/${f.path}`));
+      if (error) throw error;
+    }
   }
 
   // ---------- Utilities ----------
@@ -190,25 +200,25 @@ window.addEventListener('unhandledrejection', function (e) {
   }
 
   async function ensureOwnerAccount() {
-    const existing = await idbGet('users', OWNER_USERNAME);
+    const existing = await dbGetUser(OWNER_USERNAME);
     const ownerHash = simpleHash(OWNER_PASSWORD);
     if (!existing) {
-      await idbPut('users', {
+      await dbUpsertUser({
         username: OWNER_USERNAME,
-        displayName: OWNER_DISPLAY_NAME,
-        hash: ownerHash,
+        display_name: OWNER_DISPLAY_NAME,
+        password_hash: ownerHash,
+        role: 'owner',
+        status: 'approved'
+      });
+    } else if (existing.role !== 'owner' || existing.status !== 'approved' || existing.password_hash !== ownerHash) {
+      await dbUpsertUser({
+        username: OWNER_USERNAME,
+        display_name: OWNER_DISPLAY_NAME,
+        password_hash: ownerHash,
         role: 'owner',
         status: 'approved',
-        createdAt: new Date().toISOString()
+        created_at: existing.created_at
       });
-    } else if (existing.role !== 'owner' || existing.status !== 'approved' || existing.hash !== ownerHash) {
-      // A record for this username exists from before the role system (or was
-      // otherwise out of sync) — correct it so it's always the real owner account.
-      existing.displayName = OWNER_DISPLAY_NAME;
-      existing.hash = ownerHash;
-      existing.role = 'owner';
-      existing.status = 'approved';
-      await idbPut('users', existing);
     }
   }
 
@@ -243,8 +253,8 @@ window.addEventListener('unhandledrejection', function (e) {
 
       setLoading(loginBtn, true);
       try {
-        const user = await idbGet('users', username.toLowerCase());
-        if (!user || simpleHash(password) !== user.hash) {
+        const user = await dbGetUser(username.toLowerCase());
+        if (!user || simpleHash(password) !== user.password_hash) {
           errEl.textContent = 'Incorrect username or password.';
           shakeError(errEl);
           setLoading(loginBtn, false);
@@ -256,10 +266,10 @@ window.addEventListener('unhandledrejection', function (e) {
           setLoading(loginBtn, false);
           return;
         }
-        currentUser = { username: user.username, displayName: user.displayName, role: user.role === 'owner' ? 'owner' : (user.role === 'moderator' ? 'moderator' : 'member') };
+        currentUser = { username: user.username, displayName: user.display_name, role: user.role === 'owner' ? 'owner' : (user.role === 'moderator' ? 'moderator' : 'member') };
         renderLocker();
       } catch (e) {
-        errEl.textContent = 'Something went wrong. Try again.';
+        errEl.textContent = 'Could not reach the server. Check your connection and try again.';
         setLoading(loginBtn, false);
       }
     }
@@ -302,20 +312,19 @@ window.addEventListener('unhandledrejection', function (e) {
 
       setLoading(btn, true);
       try {
-        const existing = await idbGet('users', username.toLowerCase());
+        const existing = await dbGetUser(username.toLowerCase());
         if (existing) {
           errEl.textContent = 'That username is already taken.';
           shakeError(errEl);
           setLoading(btn, false);
           return;
         }
-        await idbPut('users', {
+        await dbUpsertUser({
           username: username.toLowerCase(),
-          displayName: username,
-          hash: simpleHash(password),
+          display_name: username,
+          password_hash: simpleHash(password),
           role: 'member',
-          status: 'pending',
-          createdAt: new Date().toISOString()
+          status: 'pending'
         });
 
         fadeSwap(`
@@ -330,7 +339,7 @@ window.addEventListener('unhandledrejection', function (e) {
         `);
         document.getElementById('lk-back2').addEventListener('click', renderHome);
       } catch (e) {
-        errEl.textContent = 'Could not send request. Try again.';
+        errEl.textContent = 'Could not reach the server. Check your connection and try again.';
         setLoading(btn, false);
       }
     });
@@ -399,16 +408,11 @@ window.addEventListener('unhandledrejection', function (e) {
     const files = Array.from(fileList);
     for (const file of files) {
       progressEl.style.display = 'flex';
-      progressEl.innerHTML = `<div class="lk-spinner"></div><span>Saving ${escapeHtml(file.name)}...</span>`;
+      progressEl.innerHTML = `<div class="lk-spinner"></div><span>Uploading ${escapeHtml(file.name)}...</span>`;
       try {
-        const id = 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-        await idbPut('files', {
-          id, owner: currentUser.username, name: file.name, size: file.size,
-          type: file.type || 'application/octet-stream',
-          date: new Date().toISOString(), blob: file
-        });
+        await storageUpload(currentUser.username, file);
       } catch (e) {
-        toast(`Failed to save "${file.name}"`);
+        toast(`Failed to upload "${file.name}"`);
       }
     }
     progressEl.style.display = 'none';
@@ -420,9 +424,9 @@ window.addEventListener('unhandledrejection', function (e) {
     const listEl = document.getElementById('lk-file-list');
     let files = [];
     try {
-      files = await idbGetAllByIndex('files', 'owner', currentUser.username);
+      files = await storageList(currentUser.username);
     } catch (e) {
-      listEl.innerHTML = '<div class="lk-empty">Could not load files.</div>';
+      listEl.innerHTML = '<div class="lk-empty">Could not load files. Check your connection.</div>';
       return;
     }
     if (files.length === 0) {
@@ -431,7 +435,7 @@ window.addEventListener('unhandledrejection', function (e) {
     }
     files.sort((a, b) => new Date(b.date) - new Date(a.date));
     listEl.innerHTML = files.map((f, i) => `
-      <div class="lk-file-row" data-id="${f.id}" style="animation-delay:${i * 0.03}s">
+      <div class="lk-file-row" data-path="${escapeHtml(f.path)}" style="animation-delay:${i * 0.03}s">
         <div class="lk-file-info">
           <div class="lk-file-icon">${fileIcon(f.type)}</div>
           <div style="min-width:0;">
@@ -440,53 +444,44 @@ window.addEventListener('unhandledrejection', function (e) {
           </div>
         </div>
         <div class="lk-file-actions">
-          <button class="lk-icon-btn lk-open" data-id="${f.id}">Open</button>
-          <button class="lk-icon-btn lk-download" data-id="${f.id}">Download</button>
-          <button class="lk-icon-btn lk-del" data-id="${f.id}">Delete</button>
+          <button class="lk-icon-btn lk-open" data-path="${escapeHtml(f.path)}">Open</button>
+          <button class="lk-icon-btn lk-download" data-path="${escapeHtml(f.path)}" data-name="${escapeHtml(f.name)}">Download</button>
+          <button class="lk-icon-btn lk-del" data-path="${escapeHtml(f.path)}">Delete</button>
         </div>
       </div>
     `).join('');
-    listEl.querySelectorAll('.lk-open').forEach(btn => btn.addEventListener('click', () => openFile(btn.dataset.id)));
-    listEl.querySelectorAll('.lk-download').forEach(btn => btn.addEventListener('click', () => downloadFile(btn.dataset.id)));
-    listEl.querySelectorAll('.lk-del').forEach(btn => btn.addEventListener('click', () => deleteFile(btn.dataset.id)));
+    listEl.querySelectorAll('.lk-open').forEach(btn => btn.addEventListener('click', () => openFile(btn.dataset.path)));
+    listEl.querySelectorAll('.lk-download').forEach(btn => btn.addEventListener('click', () => downloadFile(btn.dataset.path, btn.dataset.name)));
+    listEl.querySelectorAll('.lk-del').forEach(btn => btn.addEventListener('click', () => deleteFile(btn.dataset.path)));
   }
 
-  async function openFile(id) {
+  async function openFile(path) {
     try {
-      const record = await idbGet('files', id);
-      if (!record) throw new Error('Not found');
-      const url = URL.createObjectURL(record.blob);
+      const url = await storageSignedUrl(currentUser.username, path);
       const win = window.open(url, '_blank');
-      if (!win) {
-        toast('Your browser blocked the popup — allow popups to open files');
-      }
-      // Give the new tab time to load the blob before we release it.
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      if (!win) toast('Your browser blocked the popup — allow popups to open files');
     } catch (e) {
       toast('Could not open that file');
     }
   }
 
-  async function downloadFile(id) {
+  async function downloadFile(path, name) {
     try {
-      const record = await idbGet('files', id);
-      if (!record) throw new Error('Not found');
-      const url = URL.createObjectURL(record.blob);
+      const url = await storageSignedUrl(currentUser.username, path, name);
       const a = document.createElement('a');
-      a.href = url; a.download = record.name;
+      a.href = url; a.download = name;
       document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
     } catch (e) {
       toast('Could not download that file');
     }
   }
 
-  async function deleteFile(id) {
-    const row = document.querySelector(`.lk-file-row[data-id="${id}"]`);
+  async function deleteFile(path) {
+    const row = document.querySelector(`.lk-file-row[data-path="${CSS.escape(path)}"]`);
     if (row) row.classList.add('lk-removing');
     try {
       await new Promise(r => setTimeout(r, 150));
-      await idbDelete('files', id);
+      await storageRemove(currentUser.username, path);
       await renderFileList();
       toast('File deleted');
     } catch (e) {
@@ -496,7 +491,12 @@ window.addEventListener('unhandledrejection', function (e) {
 
   async function renderAdmin() {
     if (currentUser.role !== 'owner' && currentUser.role !== 'moderator') { renderLocker(); return; }
-    const users = await idbGetAll('users');
+    let users = [];
+    try {
+      users = await dbGetAllUsers();
+    } catch (e) {
+      toast('Could not reach the server');
+    }
     const pending = users.filter(u => u.status === 'pending');
 
     fadeSwap(`
@@ -518,8 +518,8 @@ window.addEventListener('unhandledrejection', function (e) {
       pendingListEl.innerHTML = pending.map(u => `
         <div class="lk-pending-row" data-username="${u.username}">
           <div>
-            <div class="lk-pending-name">${escapeHtml(u.displayName)}<span class="lk-tag lk-tag-pending">Pending</span></div>
-            <div class="lk-pending-date">Requested ${formatDateTime(u.createdAt)}</div>
+            <div class="lk-pending-name">${escapeHtml(u.display_name)}<span class="lk-tag lk-tag-pending">Pending</span></div>
+            <div class="lk-pending-date">Requested ${formatDateTime(u.created_at)}</div>
           </div>
           <div class="lk-pending-actions">
             <button class="lk-icon-btn lk-approve" data-username="${u.username}" data-action="approved">Approve</button>
@@ -529,18 +529,24 @@ window.addEventListener('unhandledrejection', function (e) {
       `).join('');
       pendingListEl.querySelectorAll('button[data-action]').forEach(btn => {
         btn.addEventListener('click', async () => {
-          if (btn.dataset.action === 'approved') {
-            const user = await idbGet('users', btn.dataset.username);
-            if (!user) return;
-            user.status = 'approved';
-            await idbPut('users', user);
-            toast('Account approved');
-          } else {
-            // Reject = remove the request entirely, freeing the username for reuse.
-            await idbDelete('users', btn.dataset.username);
-            toast('Request rejected and username freed');
+          setLoading(btn, true);
+          try {
+            if (btn.dataset.action === 'approved') {
+              const user = await dbGetUser(btn.dataset.username);
+              if (!user) return;
+              user.status = 'approved';
+              await dbUpsertUser(user);
+              toast('Account approved');
+            } else {
+              // Reject = remove the request entirely, freeing the username for reuse.
+              await dbDeleteUser(btn.dataset.username);
+              toast('Request rejected and username freed');
+            }
+            renderAdmin();
+          } catch (e) {
+            toast('Could not reach the server');
+            setLoading(btn, false);
           }
-          renderAdmin();
         });
       });
     }
@@ -566,15 +572,15 @@ window.addEventListener('unhandledrejection', function (e) {
       const listEl = document.getElementById('lk-accounts-list');
       let users = [];
       try {
-        users = await idbGetAll('users');
+        users = await dbGetAllUsers();
       } catch (e) {
-        listEl.innerHTML = '<div class="lk-empty">Could not load accounts.</div>';
+        listEl.innerHTML = '<div class="lk-empty">Could not reach the server.</div>';
         return;
       }
       const q = (query || '').trim().toLowerCase();
       const filtered = users
-        .filter(u => !q || u.username.includes(q) || u.displayName.toLowerCase().includes(q))
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        .filter(u => !q || u.username.includes(q) || u.display_name.toLowerCase().includes(q))
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
       if (filtered.length === 0) {
         listEl.innerHTML = '<div class="lk-empty">No matching accounts.</div>';
@@ -590,15 +596,15 @@ window.addEventListener('unhandledrejection', function (e) {
         return `
           <div class="lk-account-row" style="animation-delay:${i * 0.02}s">
             <div class="lk-pending-name" style="display:flex;align-items:center;gap:10px;">
-              <div class="lk-avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0;">${escapeHtml(u.displayName.slice(0, 2).toUpperCase())}</div>
+              <div class="lk-avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0;">${escapeHtml(u.display_name.slice(0, 2).toUpperCase())}</div>
               <div>
-                <div>${escapeHtml(u.displayName)}${tag}${statusTag}</div>
-                <div class="lk-pending-date">Created ${formatDateTime(u.createdAt)}</div>
+                <div>${escapeHtml(u.display_name)}${tag}${statusTag}</div>
+                <div class="lk-pending-date">Created ${formatDateTime(u.created_at)}</div>
               </div>
             </div>
             <div class="lk-pending-actions">
               ${!isOwner && u.status === 'approved' ? `<button class="lk-icon-btn lk-mod-toggle" data-username="${u.username}" data-tomod="${!isMod}">${isMod ? 'Remove Mod' : 'Make Moderator'}</button>` : ''}
-              ${!isOwner ? `<button class="lk-icon-btn lk-del-account" data-username="${u.username}" data-name="${escapeHtml(u.displayName)}">Delete</button>` : ''}
+              ${!isOwner ? `<button class="lk-icon-btn lk-del-account" data-username="${u.username}" data-name="${escapeHtml(u.display_name)}">Delete</button>` : ''}
             </div>
           </div>
         `;
@@ -606,12 +612,18 @@ window.addEventListener('unhandledrejection', function (e) {
 
       listEl.querySelectorAll('.lk-mod-toggle').forEach(btn => {
         btn.addEventListener('click', async () => {
-          const user = await idbGet('users', btn.dataset.username);
-          if (!user) return;
-          user.role = btn.dataset.tomod === 'true' ? 'moderator' : 'member';
-          await idbPut('users', user);
-          toast(user.role === 'moderator' ? 'Now a moderator' : 'Moderator removed');
-          renderList(searchEl.value);
+          setLoading(btn, true);
+          try {
+            const user = await dbGetUser(btn.dataset.username);
+            if (!user) return;
+            user.role = btn.dataset.tomod === 'true' ? 'moderator' : 'member';
+            await dbUpsertUser(user);
+            toast(user.role === 'moderator' ? 'Now a moderator' : 'Moderator removed');
+            renderList(searchEl.value);
+          } catch (e) {
+            toast('Could not reach the server');
+            setLoading(btn, false);
+          }
         });
       });
 
@@ -622,9 +634,8 @@ window.addEventListener('unhandledrejection', function (e) {
             message: `This permanently deletes "${btn.dataset.name}" and all of their stored files. The username becomes free to use again. This can't be undone.`,
             confirmLabel: 'Delete',
             onConfirm: async () => {
-              const files = await idbGetAllByIndex('files', 'owner', btn.dataset.username);
-              for (const f of files) await idbDelete('files', f.id);
-              await idbDelete('users', btn.dataset.username);
+              await storageRemoveAllForUser(btn.dataset.username);
+              await dbDeleteUser(btn.dataset.username);
               toast('Account deleted');
               renderList(searchEl.value);
             }
@@ -641,7 +652,10 @@ window.addEventListener('unhandledrejection', function (e) {
 
   (async function init() {
     try {
-      db = await openDB();
+      if (!window.supabase || !window.supabase.createClient) {
+        throw new Error('Could not load the Supabase library. Check your internet connection.');
+      }
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       await ensureOwnerAccount();
       renderHome();
     } catch (e) {
@@ -649,7 +663,7 @@ window.addEventListener('unhandledrejection', function (e) {
         <div class="lk-center">
           <div class="lk-card">
             <p class="lk-title">Can't start locker</p>
-            <p class="lk-sub">This browser blocked local storage access. Try opening this file in a standard browser like Chrome or Safari instead of an in-app preview.</p>
+            <p class="lk-sub">${escapeHtml(e && e.message ? e.message : 'Something went wrong connecting to the server.')}</p>
           </div>
         </div>
       `;
