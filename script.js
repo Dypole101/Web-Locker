@@ -191,15 +191,24 @@ window.addEventListener('unhandledrejection', function (e) {
 
   async function ensureOwnerAccount() {
     const existing = await idbGet('users', OWNER_USERNAME);
+    const ownerHash = simpleHash(OWNER_PASSWORD);
     if (!existing) {
       await idbPut('users', {
         username: OWNER_USERNAME,
         displayName: OWNER_DISPLAY_NAME,
-        hash: simpleHash(OWNER_PASSWORD),
+        hash: ownerHash,
         role: 'owner',
         status: 'approved',
         createdAt: new Date().toISOString()
       });
+    } else if (existing.role !== 'owner' || existing.status !== 'approved' || existing.hash !== ownerHash) {
+      // A record for this username exists from before the role system (or was
+      // otherwise out of sync) — correct it so it's always the real owner account.
+      existing.displayName = OWNER_DISPLAY_NAME;
+      existing.hash = ownerHash;
+      existing.role = 'owner';
+      existing.status = 'approved';
+      await idbPut('users', existing);
     }
   }
 
