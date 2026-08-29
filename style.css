@@ -102,6 +102,13 @@
     font-size: 13px; font-weight: 700; color: white; flex-shrink: 0;
   }
   .lk-topbar-actions { display: flex; gap: 8px; }
+  .lk-badge {
+    position: absolute; top: -6px; right: -6px;
+    min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+    background: var(--danger); color: white; font-size: 10px; font-weight: 700;
+    align-items: center; justify-content: center; line-height: 1;
+    box-shadow: 0 0 0 2px var(--bg-2); animation: popIn 0.25s ease both;
+  }
   .lk-app { max-width: 640px; margin: 0 auto; }
 
   .lk-drop {
@@ -199,4 +206,4 @@
   .lk-modal-actions { display: flex; gap: 10px; }
   .lk-modal-actions .lk-btn { margin-top: 0; }
   .lk-modal-danger { background: linear-gradient(135deg, #ff6c6c, #ff4d6d); }
-                                                                            
+      
