@@ -29,6 +29,7 @@ window.addEventListener('unhandledrejection', function (e) {
   const OWNER_PASSWORD = 'Anshith@17';
   let sb = null;
   let currentUser = null; // { username, displayName, role: 'owner' | 'moderator' | 'member' }
+  let usersChannel = null;
 
   // ---------- Supabase helpers ----------
 
@@ -95,6 +96,47 @@ window.addEventListener('unhandledrejection', function (e) {
       const { error } = await sb.storage.from(BUCKET).remove(files.map(f => `${username}/${f.path}`));
       if (error) throw error;
     }
+  }
+
+  // ---------- Realtime (live account requests) ----------
+
+  function subscribeToUserChanges() {
+    if (usersChannel) return;
+    usersChannel = sb.channel('users-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, handleUsersRealtimeEvent)
+      .subscribe();
+  }
+
+  function unsubscribeFromUserChanges() {
+    if (usersChannel) {
+      sb.removeChannel(usersChannel);
+      usersChannel = null;
+    }
+  }
+
+  function handleUsersRealtimeEvent(payload) {
+    refreshPendingBadge();
+    if (payload.eventType === 'INSERT' && payload.new && payload.new.status === 'pending') {
+      toast(`New account request: ${payload.new.display_name}`);
+    }
+    // Live-refresh whichever admin screen is currently open.
+    if (document.getElementById('lk-pending-list')) renderAdmin();
+    else if (document.getElementById('lk-accounts-list')) renderAccounts();
+  }
+
+  async function refreshPendingBadge() {
+    const badge = document.getElementById('lk-pending-badge');
+    if (!badge) return;
+    try {
+      const { count, error } = await sb.from('users').select('username', { count: 'exact', head: true }).eq('status', 'pending');
+      if (error) throw error;
+      if (count > 0) {
+        badge.textContent = count > 9 ? '9+' : String(count);
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    } catch (e) { /* non-critical, ignore */ }
   }
 
   // ---------- Utilities ----------
@@ -267,6 +309,7 @@ window.addEventListener('unhandledrejection', function (e) {
           return;
         }
         currentUser = { username: user.username, displayName: user.display_name, role: user.role === 'owner' ? 'owner' : (user.role === 'moderator' ? 'moderator' : 'member') };
+        if (currentUser.role === 'owner' || currentUser.role === 'moderator') subscribeToUserChanges();
         renderLocker();
       } catch (e) {
         errEl.textContent = 'Could not reach the server. Check your connection and try again.';
@@ -361,7 +404,7 @@ window.addEventListener('unhandledrejection', function (e) {
           </div>
         </div>
         <div class="lk-topbar-actions">
-          ${currentUser.role === 'owner' || currentUser.role === 'moderator' ? '<button class="lk-btn lk-btn-secondary" id="lk-admin" style="width:auto;padding:8px 14px;font-size:13px;">Admin</button>' : ''}
+          ${currentUser.role === 'owner' || currentUser.role === 'moderator' ? '<button class="lk-btn lk-btn-secondary" id="lk-admin" style="width:auto;padding:8px 14px;font-size:13px;position:relative;">Admin<span id="lk-pending-badge" class="lk-badge" style="display:none;"></span></button>' : ''}
           ${currentUser.role === 'owner' ? '<button class="lk-btn lk-btn-secondary" id="lk-accounts" style="width:auto;padding:8px 14px;font-size:13px;">Accounts</button>' : ''}
           <button class="lk-btn lk-btn-secondary" id="lk-logout" style="width:auto;padding:8px 14px;font-size:13px;">Log out</button>
         </div>
@@ -378,9 +421,10 @@ window.addEventListener('unhandledrejection', function (e) {
       </div>
     `);
 
-    document.getElementById('lk-logout').addEventListener('click', () => { currentUser = null; renderHome(); });
+    document.getElementById('lk-logout').addEventListener('click', () => { unsubscribeFromUserChanges(); currentUser = null; renderHome(); });
     if (currentUser.role === 'owner' || currentUser.role === 'moderator') {
       document.getElementById('lk-admin').addEventListener('click', renderAdmin);
+      refreshPendingBadge();
     }
     if (currentUser.role === 'owner') {
       document.getElementById('lk-accounts').addEventListener('click', renderAccounts);
@@ -502,7 +546,10 @@ window.addEventListener('unhandledrejection', function (e) {
     fadeSwap(`
       <div class="lk-topbar">
         <p class="lk-title" style="margin:0;">Admin · Pending Requests</p>
-        <button class="lk-btn lk-btn-secondary" id="lk-back-locker" style="width:auto;padding:8px 14px;font-size:13px;">Back</button>
+        <div class="lk-topbar-actions">
+          <button class="lk-btn lk-btn-secondary" id="lk-refresh" style="width:auto;padding:8px 14px;font-size:13px;">↻ Refresh</button>
+          <button class="lk-btn lk-btn-secondary" id="lk-back-locker" style="width:auto;padding:8px 14px;font-size:13px;">Back</button>
+        </div>
       </div>
       <div class="lk-app">
         <div id="lk-pending-list"></div>
@@ -510,6 +557,10 @@ window.addEventListener('unhandledrejection', function (e) {
     `);
 
     document.getElementById('lk-back-locker').addEventListener('click', renderLocker);
+    document.getElementById('lk-refresh').addEventListener('click', async (e) => {
+      setLoading(e.currentTarget, true);
+      await renderAdmin();
+    });
 
     const pendingListEl = document.getElementById('lk-pending-list');
     if (pending.length === 0) {
@@ -557,7 +608,10 @@ window.addEventListener('unhandledrejection', function (e) {
     fadeSwap(`
       <div class="lk-topbar">
         <p class="lk-title" style="margin:0;">Accounts</p>
-        <button class="lk-btn lk-btn-secondary" id="lk-back-locker" style="width:auto;padding:8px 14px;font-size:13px;">Back</button>
+        <div class="lk-topbar-actions">
+          <button class="lk-btn lk-btn-secondary" id="lk-refresh" style="width:auto;padding:8px 14px;font-size:13px;">↻ Refresh</button>
+          <button class="lk-btn lk-btn-secondary" id="lk-back-locker" style="width:auto;padding:8px 14px;font-size:13px;">Back</button>
+        </div>
       </div>
       <div class="lk-app">
         <input id="lk-account-search" class="lk-input" type="text" placeholder="Search by username..." />
@@ -645,6 +699,11 @@ window.addEventListener('unhandledrejection', function (e) {
     }
 
     searchEl.addEventListener('input', () => renderList(searchEl.value));
+    document.getElementById('lk-refresh').addEventListener('click', async (e) => {
+      setLoading(e.currentTarget, true);
+      await renderList(searchEl.value);
+      setLoading(e.currentTarget, false);
+    });
     await renderList('');
   }
 
