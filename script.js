@@ -23,8 +23,11 @@ window.addEventListener('unhandledrejection', function (e) {
   const root = document.getElementById('root');
   const DB_NAME = 'fileLockerMultiUserDB';
   const DB_VERSION = 1;
+  const OWNER_USERNAME = 'anshith';
+  const OWNER_DISPLAY_NAME = 'Anshith';
+  const OWNER_PASSWORD = 'Anshith@17';
   let db = null;
-  let currentUser = null; // { username, isAdmin }
+  let currentUser = null; // { username, displayName, role: 'owner' | 'moderator' | 'member' }
 
   // ---------- IndexedDB helpers ----------
 
@@ -122,6 +125,13 @@ window.addEventListener('unhandledrejection', function (e) {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
   }
+  function formatDateTime(iso) {
+    try {
+      return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    } catch (e) {
+      return new Date(iso).toLocaleString();
+    }
+  }
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -150,14 +160,52 @@ window.addEventListener('unhandledrejection', function (e) {
     root.innerHTML = html;
   }
 
+  function showConfirmModal({ title, message, confirmLabel, onConfirm }) {
+    const overlay = document.createElement('div');
+    overlay.className = 'lk-modal-overlay';
+    overlay.innerHTML = `
+      <div class="lk-modal-card">
+        <p class="lk-modal-title">${escapeHtml(title)}</p>
+        <p class="lk-modal-message">${escapeHtml(message)}</p>
+        <div class="lk-modal-actions">
+          <button class="lk-btn lk-btn-secondary" id="lk-modal-cancel">Cancel</button>
+          <button class="lk-btn lk-modal-danger" id="lk-modal-confirm">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    function close() { overlay.remove(); }
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('#lk-modal-cancel').addEventListener('click', close);
+    overlay.querySelector('#lk-modal-confirm').addEventListener('click', async () => {
+      const btn = overlay.querySelector('#lk-modal-confirm');
+      setLoading(btn, true);
+      try {
+        await onConfirm();
+        close();
+      } catch (e) {
+        setLoading(btn, false);
+      }
+    });
+  }
+
+  async function ensureOwnerAccount() {
+    const existing = await idbGet('users', OWNER_USERNAME);
+    if (!existing) {
+      await idbPut('users', {
+        username: OWNER_USERNAME,
+        displayName: OWNER_DISPLAY_NAME,
+        hash: simpleHash(OWNER_PASSWORD),
+        role: 'owner',
+        status: 'approved',
+        createdAt: new Date().toISOString()
+      });
+    }
+  }
+
   // ---------- Screens ----------
 
   async function renderHome() {
-    const users = await idbGetAll('users');
-    if (users.length === 0) {
-      renderFirstRunSetup();
-      return;
-    }
     fadeSwap(`
       <div class="lk-center">
         <div class="lk-card">
@@ -199,7 +247,7 @@ window.addEventListener('unhandledrejection', function (e) {
           setLoading(loginBtn, false);
           return;
         }
-        currentUser = { username: user.username, displayName: user.displayName, isAdmin: !!user.isAdmin };
+        currentUser = { username: user.username, displayName: user.displayName, role: user.role === 'owner' ? 'owner' : (user.role === 'moderator' ? 'moderator' : 'member') };
         renderLocker();
       } catch (e) {
         errEl.textContent = 'Something went wrong. Try again.';
@@ -210,55 +258,6 @@ window.addEventListener('unhandledrejection', function (e) {
     loginBtn.addEventListener('click', doLogin);
     pEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
     document.getElementById('lk-goto-signup').addEventListener('click', renderSignup);
-  }
-
-  function renderFirstRunSetup() {
-    fadeSwap(`
-      <div class="lk-center">
-        <div class="lk-card">
-          <div class="lk-logo">🔐</div>
-          <p class="lk-title">Set up your locker</p>
-          <p class="lk-sub">You're the first person here, so this account becomes the owner/admin account. It's approved automatically and can approve future requests.</p>
-          <input id="lk-username" class="lk-input" type="text" placeholder="Choose a username" autocomplete="username" />
-          <input id="lk-password" class="lk-input" type="password" placeholder="Choose a password" autocomplete="new-password" />
-          <input id="lk-password2" class="lk-input" type="password" placeholder="Confirm password" />
-          <p class="lk-error" id="lk-err"></p>
-          <button class="lk-btn" id="lk-create-admin">Create Owner Account</button>
-        </div>
-      </div>
-    `);
-
-    const errEl = document.getElementById('lk-err');
-    const btn = document.getElementById('lk-create-admin');
-
-    btn.addEventListener('click', async () => {
-      const username = document.getElementById('lk-username').value.trim();
-      const password = document.getElementById('lk-password').value;
-      const password2 = document.getElementById('lk-password2').value;
-      errEl.textContent = '';
-
-      if (!username || username.length < 2) { errEl.textContent = 'Choose a username (2+ characters).'; shakeError(errEl); return; }
-      if (password.length < 4) { errEl.textContent = 'Use a password with 4+ characters.'; shakeError(errEl); return; }
-      if (password !== password2) { errEl.textContent = 'Passwords do not match.'; shakeError(errEl); return; }
-
-      setLoading(btn, true);
-      try {
-        await idbPut('users', {
-          username: username.toLowerCase(),
-          displayName: username,
-          hash: simpleHash(password),
-          isAdmin: true,
-          status: 'approved',
-          createdAt: new Date().toISOString()
-        });
-        currentUser = { username: username.toLowerCase(), displayName: username, isAdmin: true };
-        toast('Owner account created');
-        renderLocker();
-      } catch (e) {
-        errEl.textContent = 'Could not create account. Try again.';
-        setLoading(btn, false);
-      }
-    });
   }
 
   function renderSignup() {
@@ -305,7 +304,7 @@ window.addEventListener('unhandledrejection', function (e) {
           username: username.toLowerCase(),
           displayName: username,
           hash: simpleHash(password),
-          isAdmin: false,
+          role: 'member',
           status: 'pending',
           createdAt: new Date().toISOString()
         });
@@ -330,16 +329,22 @@ window.addEventListener('unhandledrejection', function (e) {
 
   async function renderLocker() {
     const initials = currentUser.displayName.slice(0, 2).toUpperCase();
+    const roleTag = currentUser.role === 'owner'
+      ? '<span class="lk-tag lk-tag-admin">Owner</span>'
+      : currentUser.role === 'moderator'
+        ? '<span class="lk-tag lk-tag-mod">Moderator</span>'
+        : '';
     fadeSwap(`
       <div class="lk-topbar">
         <div class="lk-user-badge">
           <div class="lk-avatar">${initials}</div>
           <div>
-            <div style="font-size:14px;font-weight:600;">${escapeHtml(currentUser.displayName)}${currentUser.isAdmin ? '<span class="lk-tag lk-tag-admin">Owner</span>' : ''}</div>
+            <div style="font-size:14px;font-weight:600;">${escapeHtml(currentUser.displayName)}${roleTag}</div>
           </div>
         </div>
         <div class="lk-topbar-actions">
-          ${currentUser.isAdmin ? '<button class="lk-btn lk-btn-secondary" id="lk-admin" style="width:auto;padding:8px 14px;font-size:13px;">Admin</button>' : ''}
+          ${currentUser.role === 'owner' || currentUser.role === 'moderator' ? '<button class="lk-btn lk-btn-secondary" id="lk-admin" style="width:auto;padding:8px 14px;font-size:13px;">Admin</button>' : ''}
+          ${currentUser.role === 'owner' ? '<button class="lk-btn lk-btn-secondary" id="lk-accounts" style="width:auto;padding:8px 14px;font-size:13px;">Accounts</button>' : ''}
           <button class="lk-btn lk-btn-secondary" id="lk-logout" style="width:auto;padding:8px 14px;font-size:13px;">Log out</button>
         </div>
       </div>
@@ -356,7 +361,12 @@ window.addEventListener('unhandledrejection', function (e) {
     `);
 
     document.getElementById('lk-logout').addEventListener('click', () => { currentUser = null; renderHome(); });
-    if (currentUser.isAdmin) document.getElementById('lk-admin').addEventListener('click', renderAdmin);
+    if (currentUser.role === 'owner' || currentUser.role === 'moderator') {
+      document.getElementById('lk-admin').addEventListener('click', renderAdmin);
+    }
+    if (currentUser.role === 'owner') {
+      document.getElementById('lk-accounts').addEventListener('click', renderAccounts);
+    }
 
     const dropEl = document.getElementById('lk-drop');
     const inputEl = document.getElementById('lk-file-input');
@@ -476,9 +486,9 @@ window.addEventListener('unhandledrejection', function (e) {
   }
 
   async function renderAdmin() {
+    if (currentUser.role !== 'owner' && currentUser.role !== 'moderator') { renderLocker(); return; }
     const users = await idbGetAll('users');
     const pending = users.filter(u => u.status === 'pending');
-    const others = users.filter(u => u.status === 'approved' && u.username !== currentUser.username);
 
     fadeSwap(`
       <div class="lk-topbar">
@@ -487,7 +497,6 @@ window.addEventListener('unhandledrejection', function (e) {
       </div>
       <div class="lk-app">
         <div id="lk-pending-list"></div>
-        ${others.length ? `<p class="lk-sub" style="margin:24px 0 10px 0;">Other accounts</p><div id="lk-others-list"></div>` : ''}
       </div>
     `);
 
@@ -501,7 +510,7 @@ window.addEventListener('unhandledrejection', function (e) {
         <div class="lk-pending-row" data-username="${u.username}">
           <div>
             <div class="lk-pending-name">${escapeHtml(u.displayName)}<span class="lk-tag lk-tag-pending">Pending</span></div>
-            <div class="lk-pending-date">Requested ${new Date(u.createdAt).toLocaleString()}</div>
+            <div class="lk-pending-date">Requested ${formatDateTime(u.createdAt)}</div>
           </div>
           <div class="lk-pending-actions">
             <button class="lk-icon-btn lk-approve" data-username="${u.username}" data-action="approved">Approve</button>
@@ -526,18 +535,97 @@ window.addEventListener('unhandledrejection', function (e) {
         });
       });
     }
+  }
 
-    const othersListEl = document.getElementById('lk-others-list');
-    if (othersListEl) {
-      othersListEl.innerHTML = others.map(u => `
-        <div class="lk-pending-row">
-          <div>
-            <div class="lk-pending-name">${escapeHtml(u.displayName)}${u.isAdmin ? '<span class="lk-tag lk-tag-admin">Owner</span>' : ''}</div>
-            <div class="lk-pending-date">Approved</div>
+  async function renderAccounts() {
+    if (currentUser.role !== 'owner') { renderLocker(); return; }
+    fadeSwap(`
+      <div class="lk-topbar">
+        <p class="lk-title" style="margin:0;">Accounts</p>
+        <button class="lk-btn lk-btn-secondary" id="lk-back-locker" style="width:auto;padding:8px 14px;font-size:13px;">Back</button>
+      </div>
+      <div class="lk-app">
+        <input id="lk-account-search" class="lk-input" type="text" placeholder="Search by username..." />
+        <div id="lk-accounts-list"></div>
+      </div>
+    `);
+
+    document.getElementById('lk-back-locker').addEventListener('click', renderLocker);
+    const searchEl = document.getElementById('lk-account-search');
+
+    async function renderList(query) {
+      const listEl = document.getElementById('lk-accounts-list');
+      let users = [];
+      try {
+        users = await idbGetAll('users');
+      } catch (e) {
+        listEl.innerHTML = '<div class="lk-empty">Could not load accounts.</div>';
+        return;
+      }
+      const q = (query || '').trim().toLowerCase();
+      const filtered = users
+        .filter(u => !q || u.username.includes(q) || u.displayName.toLowerCase().includes(q))
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="lk-empty">No matching accounts.</div>';
+        return;
+      }
+
+      listEl.innerHTML = filtered.map((u, i) => {
+        const isOwner = u.role === 'owner';
+        const isMod = u.role === 'moderator';
+        const tag = isOwner ? '<span class="lk-tag lk-tag-admin">Owner</span>'
+          : isMod ? '<span class="lk-tag lk-tag-mod">Moderator</span>' : '';
+        const statusTag = u.status === 'pending' ? '<span class="lk-tag lk-tag-pending">Pending</span>' : '';
+        return `
+          <div class="lk-account-row" style="animation-delay:${i * 0.02}s">
+            <div class="lk-pending-name" style="display:flex;align-items:center;gap:10px;">
+              <div class="lk-avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0;">${escapeHtml(u.displayName.slice(0, 2).toUpperCase())}</div>
+              <div>
+                <div>${escapeHtml(u.displayName)}${tag}${statusTag}</div>
+                <div class="lk-pending-date">Created ${formatDateTime(u.createdAt)}</div>
+              </div>
+            </div>
+            <div class="lk-pending-actions">
+              ${!isOwner && u.status === 'approved' ? `<button class="lk-icon-btn lk-mod-toggle" data-username="${u.username}" data-tomod="${!isMod}">${isMod ? 'Remove Mod' : 'Make Moderator'}</button>` : ''}
+              ${!isOwner ? `<button class="lk-icon-btn lk-del-account" data-username="${u.username}" data-name="${escapeHtml(u.displayName)}">Delete</button>` : ''}
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
+
+      listEl.querySelectorAll('.lk-mod-toggle').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const user = await idbGet('users', btn.dataset.username);
+          if (!user) return;
+          user.role = btn.dataset.tomod === 'true' ? 'moderator' : 'member';
+          await idbPut('users', user);
+          toast(user.role === 'moderator' ? 'Now a moderator' : 'Moderator removed');
+          renderList(searchEl.value);
+        });
+      });
+
+      listEl.querySelectorAll('.lk-del-account').forEach(btn => {
+        btn.addEventListener('click', () => {
+          showConfirmModal({
+            title: 'Delete this account?',
+            message: `This permanently deletes "${btn.dataset.name}" and all of their stored files. The username becomes free to use again. This can't be undone.`,
+            confirmLabel: 'Delete',
+            onConfirm: async () => {
+              const files = await idbGetAllByIndex('files', 'owner', btn.dataset.username);
+              for (const f of files) await idbDelete('files', f.id);
+              await idbDelete('users', btn.dataset.username);
+              toast('Account deleted');
+              renderList(searchEl.value);
+            }
+          });
+        });
+      });
     }
+
+    searchEl.addEventListener('input', () => renderList(searchEl.value));
+    await renderList('');
   }
 
   // ---------- Init ----------
@@ -545,6 +633,7 @@ window.addEventListener('unhandledrejection', function (e) {
   (async function init() {
     try {
       db = await openDB();
+      await ensureOwnerAccount();
       renderHome();
     } catch (e) {
       root.innerHTML = `
