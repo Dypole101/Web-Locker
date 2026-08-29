@@ -1,22 +1,37 @@
-window.addEventListener('error', function (e) {
+function lkHandleGlobalError(message, filename, lineno) {
   var root = document.getElementById('root');
-  if (root) {
+  if (!root) return;
+  var appAlreadyStarted = root.children.length > 0;
+  if (!appAlreadyStarted) {
+    // Nothing has rendered yet — this is a startup failure, show full detail.
     root.innerHTML = '<div style="max-width:500px;margin:60px auto;padding:20px;font-family:sans-serif;color:#eee;background:#171b26;border:1px solid #ff6c6c;border-radius:12px;">' +
       '<h3 style="margin-top:0;color:#ff6c6c;">Something broke while loading</h3>' +
       '<pre style="white-space:pre-wrap;font-size:12px;color:#ffb3b3;">' +
-      (e.message || 'Unknown error') + (e.filename ? ('\n' + e.filename + ':' + e.lineno) : '') +
+      (message || 'Unknown error') + (filename ? ('\n' + filename + ':' + lineno) : '') +
       '</pre></div>';
+  } else {
+    // The app is already running — don't wipe the whole page over one
+    // runtime error. Log it and show a small dismissable banner instead.
+    console.error('Runtime error:', message);
+    var banner = document.getElementById('lk-global-error-toast');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'lk-global-error-toast';
+      banner.style.cssText = 'position:fixed;bottom:22px;left:50%;transform:translateX(-50%);' +
+        'background:#3a1e22;border:1px solid #ff6c6c;color:#ffb3b3;padding:10px 16px;' +
+        'border-radius:10px;font-size:12px;font-family:sans-serif;z-index:1000;max-width:90vw;';
+      document.body.appendChild(banner);
+    }
+    banner.textContent = 'Something went wrong: ' + (message || 'unknown error') + ' — try again.';
+    clearTimeout(banner._t);
+    banner._t = setTimeout(function () { banner.remove(); }, 4000);
   }
+}
+window.addEventListener('error', function (e) {
+  lkHandleGlobalError(e.message, e.filename, e.lineno);
 });
 window.addEventListener('unhandledrejection', function (e) {
-  var root = document.getElementById('root');
-  if (root && !root.querySelector('h3')) {
-    root.innerHTML = '<div style="max-width:500px;margin:60px auto;padding:20px;font-family:sans-serif;color:#eee;background:#171b26;border:1px solid #ff6c6c;border-radius:12px;">' +
-      '<h3 style="margin-top:0;color:#ff6c6c;">Something broke while loading</h3>' +
-      '<pre style="white-space:pre-wrap;font-size:12px;color:#ffb3b3;">' +
-      (e.reason && e.reason.message ? e.reason.message : String(e.reason)) +
-      '</pre></div>';
-  }
+  lkHandleGlobalError(e.reason && e.reason.message ? e.reason.message : String(e.reason));
 });
 
 (function () {
@@ -558,7 +573,8 @@ window.addEventListener('unhandledrejection', function (e) {
 
     document.getElementById('lk-back-locker').addEventListener('click', renderLocker);
     document.getElementById('lk-refresh').addEventListener('click', async (e) => {
-      setLoading(e.currentTarget, true);
+      const btn = e.currentTarget;
+      setLoading(btn, true);
       await renderAdmin();
     });
 
@@ -700,9 +716,10 @@ window.addEventListener('unhandledrejection', function (e) {
 
     searchEl.addEventListener('input', () => renderList(searchEl.value));
     document.getElementById('lk-refresh').addEventListener('click', async (e) => {
-      setLoading(e.currentTarget, true);
+      const btn = e.currentTarget;
+      setLoading(btn, true);
       await renderList(searchEl.value);
-      setLoading(e.currentTarget, false);
+      setLoading(btn, false);
     });
     await renderList('');
   }
