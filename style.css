@@ -155,21 +155,48 @@
   .lk-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 18px; line-height: 1.5; }
 
   .lk-pending-row {
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
     background: var(--card); border: 1px solid var(--border); border-radius: 12px;
     padding: 12px 14px; margin-bottom: 8px; animation: fadeSlideUp 0.3s ease both;
   }
+  .lk-account-row {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 8px; animation: fadeSlideUp 0.3s ease both;
+    transition: border-color 0.15s;
+  }
+  .lk-account-row:hover { border-color: #33394a; }
   .lk-pending-name { font-size: 14px; font-weight: 600; }
   .lk-pending-date { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .lk-pending-actions { display: flex; gap: 6px; }
+  .lk-pending-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .lk-approve { background: rgba(95,214,148,0.12); border-color: rgba(95,214,148,0.4); color: var(--success); }
   .lk-approve:hover { border-color: var(--success); }
-  .lk-reject { background: rgba(255,108,108,0.1); border-color: rgba(255,108,108,0.35); color: var(--danger); }
-  .lk-reject:hover { border-color: var(--danger); }
+  .lk-reject, .lk-del-account { background: rgba(255,108,108,0.1); border-color: rgba(255,108,108,0.35); color: var(--danger); }
+  .lk-reject:hover, .lk-del-account:hover { border-color: var(--danger); }
+  .lk-mod-toggle { background: rgba(108,140,255,0.1); border-color: rgba(108,140,255,0.35); color: var(--accent); }
+  .lk-mod-toggle:hover { border-color: var(--accent); }
 
   .lk-tag {
     display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
     padding: 2px 7px; border-radius: 6px; text-transform: uppercase; margin-left: 6px;
   }
   .lk-tag-admin { background: rgba(155,108,255,0.15); color: #c3aaff; }
+  .lk-tag-mod { background: rgba(108,140,255,0.15); color: #a8bbff; }
   .lk-tag-pending { background: rgba(255,196,0,0.15); color: #ffd866; }
+
+  .lk-modal-overlay {
+    position: fixed; inset: 0; background: rgba(6,7,11,0.72);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; z-index: 1000; animation: fadeIn 0.18s ease both;
+  }
+  .lk-modal-card {
+    background: linear-gradient(180deg, var(--card), var(--bg-2));
+    border: 1px solid var(--border); border-radius: 16px; padding: 24px;
+    width: 100%; max-width: 360px; animation: popIn 0.22s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .lk-modal-title { font-size: 17px; font-weight: 700; margin: 0 0 8px 0; }
+  .lk-modal-message { font-size: 13px; color: var(--muted); line-height: 1.55; margin: 0 0 20px 0; }
+  .lk-modal-actions { display: flex; gap: 10px; }
+  .lk-modal-actions .lk-btn { margin-top: 0; }
+  .lk-modal-danger { background: linear-gradient(135deg, #ff6c6c, #ff4d6d); }
+                                                                            
